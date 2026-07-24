@@ -147,7 +147,10 @@
   <header>
     <div class="title-row">
       <h1 id="listTitle">日程</h1>
-      <span class="count" id="countLabel"></span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="count" id="countLabel"></span>
+        <span id="bellBtn" title="任务提醒" style="font-size:19px;cursor:pointer;opacity:.5;user-select:none;">🔔</span>
+      </div>
     </div>
     <div class="tabs" id="tabs"></div>
   </header>
@@ -261,8 +264,91 @@ function load(){
   }catch(e){}
   return seed();   // 首次打开：载入示例目标树
 }
-function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    return true;
+  }catch(e){
+    // 存储失败（隐私模式/配额满）时提醒用户，避免以为存上了其实没存
+    console.warn("保存失败", e);
+    alert("⚠️ 数据保存失败，可能是浏览器隐私模式或存储空间已满。\n请在普通模式下打开，或清理空间后重试。");
+    return false;
+  }
+}
 function uid(){ return Date.now()+"-"+Math.random().toString(36).slice(2,6); }
+
+/* ---------- 到点提醒 ----------
+ 依赖：本地通知权限 + 页面在后台/前台运行时的定时检查。
+ 说明：纯前端无法在"App 完全关闭"时推送；保持页面在后台（PWA 常驻）时可提醒。
+*/
+const NOTIFIED_KEY = "stepping.notified";   // 记录已提醒过的任务，避免重复
+let notified = loadNotified();
+function loadNotified(){
+  try{ return new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY)||"[]")); }catch(e){ return new Set(); }
+}
+function saveNotified(){
+  try{ localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...notified])); }catch(e){}
+}
+
+// 请求通知权限（用户点铃铛时触发，符合浏览器要求）
+function requestNotify(){
+  if(!("Notification" in window)){ alert("当前浏览器不支持通知。\n提示：把本应用「添加到主屏幕」后，用独立窗口打开更可靠。"); return; }
+  if(Notification.permission==="granted"){ alert("✅ 提醒已开启。\n有截止时间的任务会在到点时通知你（需保持应用在后台运行）。"); updateBell(); return; }
+  if(Notification.permission==="denied"){ alert("通知已被禁用。\n请到浏览器/系统设置里，为本站重新允许通知。"); return; }
+  Notification.requestPermission().then(p=>{
+    updateBell();
+    if(p==="granted") alert("✅ 提醒已开启！到点时会通知你。");
+  });
+}
+function updateBell(){
+  const bell=document.getElementById("bellBtn");
+  if(!bell) return;
+  const on = ("Notification" in window) && Notification.permission==="granted";
+  bell.style.opacity = on ? "1" : ".45";
+  bell.textContent = on ? "🔔" : "🔕";
+  bell.title = on ? "提醒已开启" : "点击开启任务提醒";
+}
+
+// 弹出一条提醒（优先系统通知，退化为页面内提示）
+function fireReminder(task){
+  const body = "🕐 "+fmtDue(task.due);
+  if(("Notification" in window) && Notification.permission==="granted"){
+    try{
+      const n=new Notification("步步 · 该做「"+task.text+"」了", { body, tag:task.id, renotify:false });
+      n.onclick=()=>{ window.focus(); n.close(); };
+      return;
+    }catch(e){}
+  }
+  // 退化方案：页面内横幅
+  showBanner("⏰ 该做「"+task.text+"」了 · "+fmtDue(task.due));
+}
+function showBanner(text){
+  let b=document.getElementById("reminderBanner");
+  if(!b){
+    b=document.createElement("div"); b.id="reminderBanner";
+    b.style.cssText="position:fixed;left:16px;right:16px;top:calc(var(--safe-top) + 10px);z-index:999;"+
+      "background:var(--accent);color:#fff;padding:13px 16px;border-radius:14px;font-size:14px;"+
+      "box-shadow:0 6px 20px rgba(255,138,61,.45);cursor:pointer;transition:.3s;";
+    b.onclick=()=>b.remove();
+    document.body.appendChild(b);
+  }
+  b.textContent=text;
+  clearTimeout(b._t); b._t=setTimeout(()=>{ if(b) b.remove(); }, 8000);
+}
+
+// 每 30 秒扫一遍：找到已到点、未完成、未提醒过的任务
+function checkReminders(){
+  const now=Date.now();
+  allTasks().forEach(t=>{
+    if(!t.due || t.done) return;
+    const due=new Date(t.due).getTime();
+    // 到点后 10 分钟内仍会补提醒一次（防止刚好错过）
+    if(due<=now && now-due < 10*60*1000 && !notified.has(t.id)){
+      notified.add(t.id); saveNotified();
+      fireReminder(t);
+    }
+  });
+}
 
 /* ---------- 全量任务索引：跨视图按 id 找任务 ---------- */
 let expanded = {};  // { taskId: true } 记住展开状态
@@ -314,12 +400,40 @@ function renderTabs(){
     const t=document.createElement("div");
     t.className="tab"+(i===current?" active":"");
     t.textContent=list.name;
-    t.onclick=()=>goTo(i);
+    t.onclick=()=>{
+      // 再次点击已激活的清单 → 打开管理菜单（重命名 / 删除）
+      if(i===current) manageList(i); else goTo(i);
+    };
+    // 长按也可管理
+    let lpTimer=null;
+    t.addEventListener("touchstart",()=>{ lpTimer=setTimeout(()=>manageList(i),550); },{passive:true});
+    t.addEventListener("touchend",()=>clearTimeout(lpTimer),{passive:true});
+    t.addEventListener("touchmove",()=>clearTimeout(lpTimer),{passive:true});
     tabsEl.appendChild(t);
   });
   const add=document.createElement("div");
   add.className="tab add-list"; add.textContent="＋ 清单"; add.onclick=addList;
   tabsEl.appendChild(add);
+}
+
+// 管理某个清单：重命名 / 删除
+function manageList(i){
+  const list=state.day.lists[i];
+  const act=(prompt(`管理清单「${list.name}」：\n输入新名称可重命名；输入「删除」可删除该清单。`, list.name)||"").trim();
+  if(!act) return;
+  if(act==="删除"){
+    if(state.day.lists.length<=1){ alert("至少保留一个清单"); return; }
+    const cnt=list.tasks.length;
+    if(cnt>0 && !confirm(`确认删除清单「${list.name}」？\n其中 ${cnt} 个任务也会一并删除。`)) return;
+    // 从其它任务的 children 引用里摘掉本清单里的任务
+    const ids=list.tasks.map(t=>t.id);
+    allTasks().forEach(t=>{ if(t.children) t.children=t.children.filter(id=>!ids.includes(id)); });
+    state.day.lists.splice(i,1);
+    if(current>=state.day.lists.length) current=state.day.lists.length-1;
+    save(); rerender(); goTo(current);
+  }else if(act!==list.name){
+    list.name=act; save(); rerender();
+  }
 }
 
 /* ---------- 渲染任务列表 ---------- */
@@ -612,6 +726,14 @@ window.addEventListener("keydown",e=>{
 
 /* ---------- 启动 ---------- */
 switchView("day");
+
+/* ---------- 提醒：铃铛开关 + 定时检查 ---------- */
+document.getElementById("bellBtn").onclick=requestNotify;
+updateBell();
+checkReminders();                 // 打开即检查一次
+setInterval(checkReminders, 30*1000);   // 之后每 30 秒检查
+// 从后台切回前台时立即再查一次
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkReminders(); });
 
 /* ---------- PWA：让它能"装"到手机桌面、离线打开 ---------- */
 (function setupPWA(){
