@@ -399,7 +399,15 @@ function renderTask(task, listRef, ownerView){
 
   const del=document.createElement("div");
   del.className="del"; del.textContent="×";
-  del.onclick=(e)=>{ e.stopPropagation(); removeTask(task, listRef); };
+  del.onclick=(e)=>{
+    e.stopPropagation();
+    // 有子节点时提醒会连同下级一起删除
+    const kidCount=countDescendants(task);
+    const msg = kidCount>0
+      ? `确认删除「${task.text}」？\n这会同时删除它下面的 ${kidCount} 个子任务。`
+      : `确认删除「${task.text}」？`;
+    if(confirm(msg)) removeTask(task, listRef);
+  };
 
   el.appendChild(body); el.appendChild(del);
   wrap.appendChild(el);
@@ -417,6 +425,11 @@ function renderTask(task, listRef, ownerView){
 }
 
 // 删除任务：同时从父节点的 children 里摘掉，并删掉其所有子孙
+function countDescendants(task){
+  let n=0;
+  childrenOf(task).forEach(c=>{ n += 1 + countDescendants(c); });
+  return n;
+}
 function removeTask(task, listRef){
   const collect=(t,acc)=>{ acc.push(t.id); childrenOf(t).forEach(c=>collect(c,acc)); return acc; };
   const ids=collect(task,[]);
