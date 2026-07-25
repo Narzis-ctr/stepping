@@ -49,6 +49,24 @@
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
+  /* 日期切换条（仅日程视图显示） */
+  .datebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px 12px;}
+  .datebar.hidden{display:none;}
+  .datebar .nav-arrow{
+    width:32px;height:32px;border-radius:50%;background:var(--card);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;color:var(--sub);cursor:pointer;
+    font-size:15px;flex:0 0 auto;transition:.15s;user-select:none;
+  }
+  .datebar .nav-arrow:active{background:var(--accent-soft);color:var(--accent);}
+  .datebar .date-label{
+    font-size:15px;font-weight:600;min-width:160px;text-align:center;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .datebar .date-label .today-badge{
+    font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);
+    padding:2px 7px;border-radius:8px;
+  }
+  .datebar input.hidden-date{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
   .tab{
     flex:0 0 auto;padding:7px 15px;border-radius:20px;font-size:14px;font-weight:500;
     background:var(--card);color:var(--sub);border:1px solid var(--line);
@@ -156,10 +174,15 @@
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="count" id="countLabel"></span>
         <span id="backupBtn" title="备份 / 恢复" style="font-size:18px;cursor:pointer;opacity:.5;user-select:none;">⤓</span>
-        <span id="bellBtn" title="任务提醒" style="font-size:19px;cursor:pointer;opacity:.5;user-select:none;">🔔</span>
       </div>
     </div>
     <div class="tabs" id="tabs"></div>
+    <div class="datebar" id="datebar">
+      <div class="nav-arrow" id="datePrev">‹</div>
+      <div class="date-label" id="dateLabel">今天</div>
+      <div class="nav-arrow" id="dateNext">›</div>
+      <input type="date" id="datePicker" class="hidden-date" />
+    </div>
   </header>
 
   <div class="viewport" id="viewport">
@@ -209,15 +232,33 @@ const VIEW_PLACEHOLDER = {
 
 /* ---------- 数据 ----------
  state = {
-   day:  { lists:[ {name, tasks:[]} ] },   // 可滑动多清单
+   day:  { lists:[ {name, tasks:[]} ] },   // 可滑动多清单；每条 day 任务带 date:"YYYY-MM-DD"
    week: { tasks:[] }, month:{ tasks:[] }, year:{ tasks:[] }
  }
- task = { id, text, done, createdAt, due(可空), children:[归属到下级视图的子任务id] , parentText(可空) }
+ task = { id, text, done, createdAt, due(可空), date(仅日程), children:[子任务id], parentText(可空) }
 */
 let state = load();
 let view = "day";      // day | week | month | year
 let current = 0;       // 日程内当前清单索引
 let useTime = false;   // 是否展开时间选择
+let currentDate = todayStr();   // 日程当前查看的日期
+
+/* ---------- 日期工具 ---------- */
+function pad2(n){ return String(n).padStart(2,"0"); }
+function dateStr(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function todayStr(){ return dateStr(new Date()); }
+function shiftDate(str, days){ const d=new Date(str+"T00:00:00"); d.setDate(d.getDate()+days); return dateStr(d); }
+// 顶部日期条的友好文字：今天 / 明天 / 昨天 / 周几 · M月D日
+function fmtDateLabel(str){
+  const d=new Date(str+"T00:00:00");
+  const t=todayStr();
+  const week=["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
+  const md=`${d.getMonth()+1}月${d.getDate()}日`;
+  if(str===t) return `今天 · ${md}`;
+  if(str===shiftDate(t,1)) return `明天 · ${md}`;
+  if(str===shiftDate(t,-1)) return `昨天 · ${md}`;
+  return `${week} · ${md}`;
+}
 
 function blank(){
   return {
@@ -241,17 +282,18 @@ function seed(){
 
   const nowH = new Date(); nowH.setHours(20,0,0,0);
   const pad=x=>String(x).padStart(2,"0");
+  const today = todayStr();
   const todayAt=(h,m)=>{ const d=new Date(); d.setHours(h,m,0,0);
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}`; };
 
-  // 读书线的叶子
-  const read30 = mk("读《原则》30页", { parentText:"这周读完《原则》上半", due:todayAt(21,0), done:true });
-  const readNote = mk("整理2页读书笔记", { parentText:"这周读完《原则》上半", due:todayAt(21,40) });
+  // 读书线的叶子（日程任务带 date）
+  const read30 = mk("读《原则》30页", { parentText:"这周读完《原则》上半", due:todayAt(21,0), done:true, date:today });
+  const readNote = mk("整理2页读书笔记", { parentText:"这周读完《原则》上半", due:todayAt(21,40), date:today });
   // 跑步线的叶子
-  const run1 = mk("晨跑 5 公里", { parentText:"本周跑步3次", done:true });
-  const run2 = mk("晚间快走 40 分钟", { parentText:"本周跑步3次", due:todayAt(19,30) });
+  const run1 = mk("晨跑 5 公里", { parentText:"本周跑步3次", done:true, date:today });
+  const run2 = mk("晚间快走 40 分钟", { parentText:"本周跑步3次", due:todayAt(19,30), date:today });
   // 作品集线的叶子
-  const prd = mk("写完 PRD 初稿第一章", { parentText:"完成作品集2个案例", due:todayAt(15,0) });
+  const prd = mk("写完 PRD 初稿第一章", { parentText:"完成作品集2个案例", due:todayAt(15,0), date:today });
   dToday.push(read30, readNote, run2);
   dWork.push(prd);
   dLife.push(run1);
@@ -279,9 +321,19 @@ function seed(){
 function load(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
-    if(raw){ const d = JSON.parse(raw); if(d && d.day) return d; }
+    if(raw){ const d = JSON.parse(raw); if(d && d.day) return migrate(d); }
   }catch(e){}
   return seed();   // 首次打开：载入示例目标树
+}
+// 迁移：给还没有 date 的日程任务补上"今天"，保证旧数据平滑升级、不丢
+function migrate(d){
+  const t=todayStr();
+  try{
+    (d.day.lists||[]).forEach(l=>(l.tasks||[]).forEach(task=>{
+      if(!task.date) task.date=t;
+    }));
+  }catch(e){}
+  return d;
 }
 function save(){
   try{
@@ -295,79 +347,6 @@ function save(){
   }
 }
 function uid(){ return Date.now()+"-"+Math.random().toString(36).slice(2,6); }
-
-/* ---------- 到点提醒 ----------
- 依赖：本地通知权限 + 页面在后台/前台运行时的定时检查。
- 说明：纯前端无法在"App 完全关闭"时推送；保持页面在后台（PWA 常驻）时可提醒。
-*/
-const NOTIFIED_KEY = "stepping.notified";   // 记录已提醒过的任务，避免重复
-let notified = loadNotified();
-function loadNotified(){
-  try{ return new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY)||"[]")); }catch(e){ return new Set(); }
-}
-function saveNotified(){
-  try{ localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...notified])); }catch(e){}
-}
-
-// 请求通知权限（用户点铃铛时触发，符合浏览器要求）
-function requestNotify(){
-  if(!("Notification" in window)){ alert("当前浏览器不支持通知。\n提示：把本应用「添加到主屏幕」后，用独立窗口打开更可靠。"); return; }
-  if(Notification.permission==="granted"){ alert("✅ 提醒已开启。\n有截止时间的任务会在到点时通知你（需保持应用在后台运行）。"); updateBell(); return; }
-  if(Notification.permission==="denied"){ alert("通知已被禁用。\n请到浏览器/系统设置里，为本站重新允许通知。"); return; }
-  Notification.requestPermission().then(p=>{
-    updateBell();
-    if(p==="granted") alert("✅ 提醒已开启！到点时会通知你。");
-  });
-}
-function updateBell(){
-  const bell=document.getElementById("bellBtn");
-  if(!bell) return;
-  const on = ("Notification" in window) && Notification.permission==="granted";
-  bell.style.opacity = on ? "1" : ".45";
-  bell.textContent = on ? "🔔" : "🔕";
-  bell.title = on ? "提醒已开启" : "点击开启任务提醒";
-}
-
-// 弹出一条提醒（优先系统通知，退化为页面内提示）
-function fireReminder(task){
-  const body = "🕐 "+fmtDue(task.due);
-  if(("Notification" in window) && Notification.permission==="granted"){
-    try{
-      const n=new Notification("步步 · 该做「"+task.text+"」了", { body, tag:task.id, renotify:false });
-      n.onclick=()=>{ window.focus(); n.close(); };
-      return;
-    }catch(e){}
-  }
-  // 退化方案：页面内横幅
-  showBanner("⏰ 该做「"+task.text+"」了 · "+fmtDue(task.due));
-}
-function showBanner(text){
-  let b=document.getElementById("reminderBanner");
-  if(!b){
-    b=document.createElement("div"); b.id="reminderBanner";
-    b.style.cssText="position:fixed;left:16px;right:16px;top:calc(var(--safe-top) + 10px);z-index:999;"+
-      "background:var(--accent);color:#fff;padding:13px 16px;border-radius:14px;font-size:14px;"+
-      "box-shadow:0 6px 20px rgba(255,138,61,.45);cursor:pointer;transition:.3s;";
-    b.onclick=()=>b.remove();
-    document.body.appendChild(b);
-  }
-  b.textContent=text;
-  clearTimeout(b._t); b._t=setTimeout(()=>{ if(b) b.remove(); }, 8000);
-}
-
-// 每 30 秒扫一遍：找到已到点、未完成、未提醒过的任务
-function checkReminders(){
-  const now=Date.now();
-  allTasks().forEach(t=>{
-    if(!t.due || t.done) return;
-    const due=new Date(t.due).getTime();
-    // 到点后 10 分钟内仍会补提醒一次（防止刚好错过）
-    if(due<=now && now-due < 10*60*1000 && !notified.has(t.id)){
-      notified.add(t.id); saveNotified();
-      fireReminder(t);
-    }
-  });
-}
 
 /* ---------- 全量任务索引：跨视图按 id 找任务 ---------- */
 let expanded = {};  // { taskId: true } 记住展开状态
@@ -404,6 +383,11 @@ const pickerRow=document.getElementById("pickerRow");
 const timeInput=document.getElementById("timeInput");
 const clearTime=document.getElementById("clearTime");
 const navEl=document.getElementById("nav");
+const datebarEl=document.getElementById("datebar");
+const dateLabelEl=document.getElementById("dateLabel");
+const datePrevEl=document.getElementById("datePrev");
+const dateNextEl=document.getElementById("dateNext");
+const datePickerEl=document.getElementById("datePicker");
 
 /* ---------- 当前任务集合 ---------- */
 function activeTasks(){
@@ -412,8 +396,10 @@ function activeTasks(){
 
 /* ---------- 渲染顶部 ---------- */
 function renderTabs(){
-  if(view!=="day"){ tabsEl.classList.add("hidden"); return; }
+  if(view!=="day"){ tabsEl.classList.add("hidden"); datebarEl.classList.add("hidden"); return; }
   tabsEl.classList.remove("hidden");
+  datebarEl.classList.remove("hidden");
+  dateLabelEl.textContent=fmtDateLabel(currentDate);
   tabsEl.innerHTML="";
   state.day.lists.forEach((list,i)=>{
     const t=document.createElement("div");
@@ -592,12 +578,18 @@ function fillList(container, tasks, ownerView, emptyText){
   sorted.forEach(t=>container.appendChild(renderTask(t, tasks, ownerView)));
 }
 
+// 当前日期下、某清单里的任务（按日期轴过滤）
+function dayTasksOf(list){ return (list.tasks||[]).filter(t=>t.date===currentDate); }
 function renderDay(){
   trackEl.innerHTML="";
+  const isToday = currentDate===todayStr();
+  const empty = isToday
+    ? "还没有任务<br>在下方添加第一件事吧"
+    : "这一天还没有安排<br>在下方添加，或用上方箭头回到今天";
   state.day.lists.forEach(list=>{
     const page=document.createElement("div");
     page.className="page";
-    fillList(page, list.tasks, "day", "还没有任务<br>在下方添加第一件事吧");
+    fillList(page, dayTasksOf(list), "day", empty);
     trackEl.appendChild(page);
   });
   layout();
@@ -622,7 +614,8 @@ function updateHeader(){
   if(view==="day"){
     const list=state.day.lists[current];
     titleEl.textContent=list.name;
-    const total=list.tasks.length, done=list.tasks.filter(t=>t.done).length;
+    const todays=dayTasksOf(list);
+    const total=todays.length, done=todays.filter(t=>t.done).length;
     countEl.textContent= total? `${done}/${total} 已完成` : "";
   }else{
     titleEl.textContent=VIEW_TITLE[view];
@@ -651,7 +644,7 @@ function breakdown(task, ownerView){
   const text=(prompt(`把「${task.text}」拆解为一条${VIEW_TITLE[nv]}任务：`, "")||"").trim();
   if(!text) return;
   const child={ id:uid(), text, done:false, createdAt:Date.now(), due:null, parentText:task.text, children:[] };
-  if(nv==="day"){ state.day.lists[current].tasks.push(child); }
+  if(nv==="day"){ child.date=currentDate; state.day.lists[current].tasks.push(child); }
   else{ state[nv].tasks.push(child); }
   if(!task.children) task.children=[];
   task.children.push(child.id);
@@ -665,8 +658,11 @@ function addTask(){
   if(!text) return;
   const task={ id:uid(), text, done:false, createdAt:Date.now(),
     due:(useTime&&timeInput.value)? timeInput.value : null, parentText:null, children:[] };
+  if(view==="day") task.date=currentDate;   // 日程任务归属到当前查看的日期
   activeTasks().push(task);
   inputEl.value="";
+  // 加完任务后收起时间选择器，恢复干净的输入栏
+  useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); timeInput.value="";
   save(); rerender();
   if(view==="day") requestAnimationFrame(()=>{ if(trackEl.children[current])trackEl.children[current].scrollTop=0; });
   else singleEl.scrollTop=0;
@@ -737,6 +733,23 @@ navEl.querySelectorAll(".nav-item").forEach(it=>{
   it.onclick=()=>switchView(it.dataset.view);
 });
 
+/* ---------- 日期轴：前后翻天 / 直接选日期 ---------- */
+function goToDate(str){
+  currentDate=str;
+  rerender();
+  requestAnimationFrame(()=>{ if(trackEl.children[current]) trackEl.children[current].scrollTop=0; });
+}
+datePrevEl.onclick=()=>goToDate(shiftDate(currentDate,-1));
+dateNextEl.onclick=()=>goToDate(shiftDate(currentDate,1));
+// 点日期文字：能回今天就先回今天，否则打开原生日期选择器
+dateLabelEl.onclick=()=>{
+  if(currentDate!==todayStr()){ goToDate(todayStr()); return; }
+  datePickerEl.value=currentDate;
+  if(datePickerEl.showPicker){ try{ datePickerEl.showPicker(); return; }catch(e){} }
+  datePickerEl.click();
+};
+datePickerEl.onchange=()=>{ if(datePickerEl.value) goToDate(datePickerEl.value); };
+
 /* ---------- 键盘（桌面预览） ---------- */
 window.addEventListener("keydown",e=>{
   if(document.activeElement===inputEl||document.activeElement===timeInput) return;
@@ -793,14 +806,6 @@ document.getElementById("backupBtn").onclick=()=>{
   if(c==="1") exportData();
   else if(c==="2") importData();
 };
-
-/* ---------- 提醒：铃铛开关 + 定时检查 ---------- */
-document.getElementById("bellBtn").onclick=requestNotify;
-updateBell();
-checkReminders();                 // 打开即检查一次
-setInterval(checkReminders, 30*1000);   // 之后每 30 秒检查
-// 从后台切回前台时立即再查一次
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkReminders(); });
 
 /* ---------- PWA：让它能"装"到手机桌面、离线打开 ---------- */
 (function setupPWA(){
