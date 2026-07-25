@@ -43,8 +43,10 @@
   }
   /* ---- 顶部标题 + 清单标签栏 ---- */
   header{padding:calc(var(--safe-top) + 14px) 0 0;background:var(--bg);flex:0 0 auto;}
-  .title-row{display:flex;align-items:baseline;justify-content:space-between;padding:0 20px 12px;}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 12px;}
   .title-row h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.5px;}
+  .title-wrap{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .title-wrap .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;}
   .title-row .count{font-size:13px;color:var(--sub);}
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
@@ -136,6 +138,29 @@
     font-size:15px;box-shadow:var(--shadow);color:var(--ink);font-family:inherit;
   }
   .picker-row .clear-time{font-size:13px;color:var(--danger);padding:6px 10px;cursor:pointer;}
+  /* 已选上级目标的提示条（输入框上方，一行文字，可点✕取消） */
+  .parent-hint{display:none;align-items:center;gap:6px;margin-bottom:8px;font-size:13px;
+    color:var(--accent);background:var(--accent-soft);border-radius:12px;padding:8px 12px;}
+  .parent-hint.show{display:flex;}
+  .parent-hint .ph-x{margin-left:auto;cursor:pointer;opacity:.7;font-size:15px;line-height:1;padding:0 2px;}
+  .parent-hint .ph-x:active{opacity:1;}
+  /* 挂靠上级弹层：分组竖排的目标列表 */
+  .ph-close{width:30px;height:30px;border-radius:50%;background:var(--bg);color:var(--sub);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;user-select:none;}
+  .ph-close:active{background:var(--accent-soft);color:var(--accent);}
+  .ph-body{max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .ph-group-label{font-size:12px;font-weight:700;color:var(--sub);margin:14px 2px 6px;letter-spacing:.5px;}
+  .ph-group-label:first-child{margin-top:2px;}
+  .ph-opt{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
+    background:var(--bg);margin-bottom:8px;cursor:pointer;transition:.12s;font-size:15px;color:var(--ink);}
+  .ph-opt:active{transform:scale(.99);}
+  .ph-opt.sel{background:var(--accent);color:#fff;}
+  .ph-opt .radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--done);flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;transition:.12s;}
+  .ph-opt.sel .radio{border-color:#fff;}
+  .ph-opt.sel .radio::after{content:"";width:10px;height:10px;border-radius:50%;background:#fff;}
+  .ph-opt .txt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ph-empty{text-align:center;color:var(--sub);font-size:14px;padding:28px 0;line-height:1.9;}
   .input-row{display:flex;gap:10px;align-items:center;}
   .composer input.main-input{
     flex:1 1 auto;border:none;outline:none;background:var(--card);
@@ -279,8 +304,11 @@
 <body>
   <header>
     <div class="title-row">
-      <h1 id="listTitle">日程</h1>
-      <div style="display:flex;align-items:center;gap:12px;">
+      <div class="title-wrap">
+        <h1 id="listTitle">日程</h1>
+        <span class="subtitle" id="subtitle"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding-top:4px;">
         <span class="count" id="countLabel"></span>
         <span class="mode-toggle" id="modeToggle" title="切换 清单 / 时间轴"></span>
         <span id="backupBtn" title="备份 / 恢复" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></span>
@@ -340,14 +368,24 @@
       <input id="timeInput" type="datetime-local" />
       <span class="clear-time" id="clearTime">清除</span>
     </div>
-    <div class="picker-row" id="parentRow" style="overflow-x:auto;">
-      <div id="parentChips" style="display:flex;gap:8px;align-items:center;white-space:nowrap;"></div>
-    </div>
+    <div class="parent-hint" id="parentHint"></div>
     <div class="input-row">
       <input id="taskInput" class="main-input" type="text" placeholder="添加任务，回车提交…" autocomplete="off" />
       <button class="icon-btn" id="parentBtn" title="挂到上级目标">🎯</button>
       <button class="icon-btn" id="timeBtn" title="设置时间">🕐</button>
       <button class="submit" id="submitBtn">＋</button>
+    </div>
+  </div>
+
+  <!-- 挂靠上级：底部弹层，按 年/月/周 分组竖排 -->
+  <div class="cal-mask" id="parentMask">
+    <div class="cal-sheet" id="parentSheet">
+      <div class="cal-head">
+        <div class="cal-title">挂到哪个上级目标？</div>
+        <div class="ph-close" id="parentClose">✕</div>
+      </div>
+      <div class="ph-body" id="parentBody"></div>
+      <div class="cal-foot"><div class="cal-today-btn" id="parentConfirm">完成</div></div>
     </div>
   </div>
 
@@ -517,6 +555,7 @@ function allTasks(){
   return out;
 }
 function taskById(id){ return allTasks().find(t=>t.id===id) || null; }
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function childrenOf(task){
   if(!task.children||!task.children.length) return [];
   return task.children.map(taskById).filter(Boolean);
@@ -535,6 +574,7 @@ const tabsEl=document.getElementById("tabs");
 const trackEl=document.getElementById("track");
 const singleEl=document.getElementById("single");
 const titleEl=document.getElementById("listTitle");
+const subtitleEl=document.getElementById("subtitle");
 const countEl=document.getElementById("countLabel");
 const inputEl=document.getElementById("taskInput");
 const submitEl=document.getElementById("submitBtn");
@@ -557,8 +597,11 @@ const calNextEl=document.getElementById("calNext");
 const calTodayEl=document.getElementById("calToday");
 const modeToggleEl=document.getElementById("modeToggle");
 const parentBtn=document.getElementById("parentBtn");
-const parentRow=document.getElementById("parentRow");
-const parentChipsEl=document.getElementById("parentChips");
+const parentHintEl=document.getElementById("parentHint");
+const parentMaskEl=document.getElementById("parentMask");
+const parentBodyEl=document.getElementById("parentBody");
+const parentCloseEl=document.getElementById("parentClose");
+const parentConfirmEl=document.getElementById("parentConfirm");
 const timerMaskEl=document.getElementById("timerMask");
 const timerTaskEl=document.getElementById("timerTask");
 const timerSubEl=document.getElementById("timerSub");
@@ -931,16 +974,22 @@ function rerender(){
 function updateHeader(){
   if(view==="day" && dayMode==="timeline"){
     titleEl.textContent="时间轴";
+    subtitleEl.textContent="今天的时间都花在哪了";
     const secs=daySessions(currentDate).reduce((s,x)=>s+(x.focusSec||0),0);
     countEl.textContent= secs>0? "共专注 "+fmtDur(secs) : "";
   }else if(view==="day"){
     const list=state.day.lists[current];
     titleEl.textContent=list.name;
+    const isToday = currentDate===todayStr();
+    subtitleEl.textContent = isToday ? "今天想做点什么？"
+      : (currentDate===shiftDate(todayStr(),1) ? "明天要做点什么？"
+      : `安排「${fmtDateLabel(currentDate).split(" · ").pop()}」`);
     const todays=dayTasksOf(list);
     const total=todays.length, done=todays.filter(t=>t.done).length;
     countEl.textContent= total? `${done}/${total} 已完成` : "";
   }else{
     titleEl.textContent=VIEW_TITLE[view];
+    subtitleEl.textContent={week:"这周要推进什么？",month:"这个月的重点",year:"今年最重要的目标"}[view]||"";
     const arr=state[view].tasks, done=arr.filter(t=>t.done).length;
     countEl.textContent= arr.length? `${done}/${arr.length} 已完成` : "";
   }
@@ -1002,7 +1051,7 @@ function addTask(){
   inputEl.value="";
   // 加完任务后收起时间/上级选择器，恢复干净的输入栏
   useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); timeInput.value="";
-  pendingParentId=null; parentRow.classList.remove("show"); parentBtn.classList.remove("on");
+  pendingParentId=null; syncParentHint();
   save(); rerender();
   if(view==="day" && dayMode==="list") requestAnimationFrame(()=>{ if(trackEl.children[current])trackEl.children[current].scrollTop=0; });
   else singleEl.scrollTop=0;
@@ -1029,33 +1078,51 @@ timeBtn.onclick=()=>{
 clearTime.onclick=()=>{ timeInput.value=""; useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); };
 
 /* ---------- 挂靠上级：选一个更高层目标 ---------- */
-function buildParentChips(){
-  parentChipsEl.innerHTML="";
-  const none=document.createElement("span");
-  none.className="chip"+(pendingParentId?"":" focused");
-  none.textContent="无上级";
-  none.style.cursor="pointer";
-  none.onclick=()=>{ pendingParentId=null; buildParentChips(); };
-  parentChipsEl.appendChild(none);
-  const label={week:"周",month:"月",year:"年"};
-  ["year","month","week"].forEach(v=>{   // 年→月→周，方便按层级挑
-    state[v].tasks.forEach(t=>{
-      const c=document.createElement("span");
+// 挂靠上级：底部弹层，按 年/月/周 分组竖排，点一项即选中
+function renderParentSheet(){
+  parentBodyEl.innerHTML="";
+  const groups=[["year","年度目标"],["month","月计划"],["week","周计划"]];
+  let any=false;
+  groups.forEach(([v,label])=>{
+    const tasks=state[v].tasks;
+    if(!tasks.length) return;
+    any=true;
+    const lb=document.createElement("div");
+    lb.className="ph-group-label"; lb.textContent=label;
+    parentBodyEl.appendChild(lb);
+    tasks.forEach(t=>{
+      const opt=document.createElement("div");
       const on=pendingParentId===t.id;
-      c.className="chip"+(on?" focused":"");
-      c.style.cursor="pointer";
-      c.innerHTML=`<b style="opacity:.6;font-weight:600;">${label[v]}</b> ${t.text}`;
-      c.onclick=()=>{ pendingParentId = on? null : t.id; buildParentChips(); };
-      parentChipsEl.appendChild(c);
+      opt.className="ph-opt"+(on?" sel":"");
+      opt.innerHTML=`<span class="radio"></span><span class="txt">${escapeHtml(t.text)}</span>`;
+      opt.onclick=()=>{ pendingParentId = on? null : t.id; renderParentSheet(); };
+      parentBodyEl.appendChild(opt);
     });
   });
+  if(!any){
+    parentBodyEl.innerHTML='<div class="ph-empty">还没有上级目标<br>先去「周/月/年」写下目标，<br>就能把今天的任务挂上去了</div>';
+  }
 }
-parentBtn.onclick=()=>{
-  const show=!parentRow.classList.contains("show");
-  parentRow.classList.toggle("show",show);
-  parentBtn.classList.toggle("on",show);
-  if(show) buildParentChips();
-};
+function openParentSheet(){ renderParentSheet(); parentMaskEl.classList.add("show"); }
+function closeParentSheet(){ parentMaskEl.classList.remove("show"); syncParentHint(); }
+// 输入框上方的"已挂靠"提示条
+function syncParentHint(){
+  const p = pendingParentId? taskById(pendingParentId) : null;
+  if(p){
+    parentHintEl.innerHTML=`🎯 挂到「${escapeHtml(p.text)}」<span class="ph-x" id="phX">✕</span>`;
+    parentHintEl.classList.add("show");
+    parentBtn.classList.add("on");
+    document.getElementById("phX").onclick=()=>{ pendingParentId=null; syncParentHint(); };
+  }else{
+    parentHintEl.classList.remove("show");
+    parentHintEl.innerHTML="";
+    parentBtn.classList.remove("on");
+  }
+}
+parentBtn.onclick=openParentSheet;
+parentCloseEl.onclick=closeParentSheet;
+parentConfirmEl.onclick=closeParentSheet;
+parentMaskEl.onclick=(e)=>{ if(e.target===parentMaskEl) closeParentSheet(); };
 
 submitEl.onclick=addTask;
 inputEl.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); });
@@ -1098,7 +1165,8 @@ function switchView(v){
   inputEl.placeholder=VIEW_PLACEHOLDER[v];
   // 离开日程时收起"挂靠上级"选择器；只有日程才显示该按钮
   parentBtn.style.display = v==="day" ? "flex" : "none";
-  if(v!=="day"){ pendingParentId=null; parentRow.classList.remove("show"); parentBtn.classList.remove("on"); }
+  if(v!=="day"){ pendingParentId=null; }
+  syncParentHint();
   rerender();
 }
 navEl.querySelectorAll(".nav-item").forEach(it=>{
