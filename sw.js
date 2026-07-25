@@ -1,5 +1,5 @@
 // 步步 —— 离线缓存 Service Worker
-const CACHE = "shiguang-v1";
+const CACHE = "shiguang-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -15,8 +15,24 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// 导航请求（index.html）走网络优先：有网永远拿最新版，离线才回退缓存；
+// 其它资源仍走缓存优先。这样每次更新一刷新就能看到，不必手动清缓存。
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  const isNav = e.request.mode === "navigate" ||
+    (e.request.destination === "document");
+  if (isNav) {
+    e.respondWith(
+      fetch(e.request)
+        .then((resp) => {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put("./index.html", copy));
+          return resp;
+        })
+        .catch(() => caches.match("./index.html").then((r) => r || caches.match("./")))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(
       (cached) =>

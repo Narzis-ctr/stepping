@@ -7,23 +7,23 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="步步" />
 <meta name="mobile-web-app-capable" content="yes" />
-<meta name="theme-color" content="#f7f7f5" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23ff8a3d'/%3E%3Cpath d='M150 262l68 68 146-160' fill='none' stroke='white' stroke-width='42' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23ff8a3d'/%3E%3Cpath d='M150 262l68 68 146-160' fill='none' stroke='white' stroke-width='42' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<meta name="theme-color" content="#f5f6f9" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%236b7fd0'/%3E%3Cpath d='M150 262l68 68 146-160' fill='none' stroke='white' stroke-width='42' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%236b7fd0'/%3E%3Cpath d='M150 262l68 68 146-160' fill='none' stroke='white' stroke-width='42' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="manifest" href="manifest.json" />
 <title>步步</title>
 <style>
   :root{
-    --bg:#f7f7f5;
+    --bg:#f5f6f9;
     --card:#ffffff;
-    --ink:#1c1c1e;
-    --sub:#8e8e93;
-    --line:#ececec;
-    --accent:#ff8a3d;
-    --accent-soft:#fff1e8;
-    --done:#c7c7cc;
-    --danger:#ff453a;
-    --shadow:0 1px 3px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
+    --ink:#20232e;
+    --sub:#8a8fa3;
+    --line:#e7e9f0;
+    --accent:#6b7fd0;
+    --accent-soft:#eceff9;
+    --done:#c3c6d4;
+    --danger:#ef5f6b;
+    --shadow:0 1px 3px rgba(32,35,46,.04),0 8px 24px rgba(80,90,140,.06);
     --safe-top:env(safe-area-inset-top,0px);
     --safe-bottom:env(safe-area-inset-bottom,0px);
     --nav-h:64px;
@@ -117,6 +117,9 @@
   .chip.parent{background:#eef4ff;color:#3d7bff;}
   .chip.break{background:transparent;border:1px dashed var(--accent);color:var(--accent);cursor:pointer;font-weight:600;}
   .chip.break:active{background:var(--accent-soft);}
+  .chip.focus{background:transparent;border:1px solid var(--accent);color:var(--accent);cursor:pointer;font-weight:600;}
+  .chip.focus:active{background:var(--accent-soft);}
+  .chip.focused{background:var(--accent-soft);color:var(--accent);font-weight:600;}
   .del{flex:0 0 auto;color:var(--sub);font-size:20px;line-height:1;padding:2px 4px;cursor:pointer;opacity:.35;}
   .del:active{opacity:1;color:var(--danger);}
   .empty{text-align:center;color:var(--sub);font-size:14px;margin-top:70px;line-height:2;}
@@ -124,7 +127,7 @@
   /* ---- 底部提交栏 ---- */
   .composer{
     position:absolute;left:0;right:0;bottom:var(--nav-h);padding:12px 16px 10px;
-    background:linear-gradient(180deg,rgba(247,247,245,0) 0%,var(--bg) 34%);
+    background:linear-gradient(180deg,rgba(245,246,249,0) 0%,var(--bg) 34%);
   }
   .picker-row{display:none;margin-bottom:8px;}
   .picker-row.show{display:flex;gap:8px;align-items:center;}
@@ -148,7 +151,7 @@
   .submit{
     flex:0 0 auto;width:48px;height:48px;border-radius:50%;border:none;background:var(--accent);
     color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;
-    box-shadow:0 4px 14px rgba(255,138,61,.4);transition:.15s;
+    box-shadow:0 4px 14px rgba(107,127,208,.4);transition:.15s;
   }
   .submit:active{transform:scale(.9);}
   /* ---- 底部四宫格导航 ---- */
@@ -165,6 +168,114 @@
   .nav-item .ni{font-size:21px;line-height:1;display:flex;align-items:center;justify-content:center;}
   .nav-item .ni svg{width:23px;height:23px;display:block;}
   .nav-item.active{color:var(--accent);}
+
+  /* ---- header 模式切换图标（清单/时间轴） ---- */
+  .mode-toggle{display:flex;align-items:center;cursor:pointer;color:var(--sub);user-select:none;padding:2px;}
+  .mode-toggle svg{width:21px;height:21px;display:block;}
+  .mode-toggle.on{color:var(--accent);}
+
+  /* ---- 番茄钟计时浮层 ---- */
+  .timer-mask{
+    position:fixed;inset:0;background:rgba(32,35,46,.32);backdrop-filter:blur(2px);
+    display:flex;align-items:center;justify-content:center;z-index:60;
+    opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .timer-mask.show{opacity:1;pointer-events:auto;}
+  .timer-card{
+    width:86%;max-width:340px;background:var(--card);border-radius:24px;
+    padding:26px 24px 22px;box-shadow:0 12px 40px rgba(40,45,80,.24);text-align:center;
+    transform:scale(.92);transition:transform .24s cubic-bezier(.22,.61,.36,1);
+  }
+  .timer-mask.show .timer-card{transform:scale(1);}
+  .timer-task{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:4px;line-height:1.35;}
+  .timer-sub{font-size:12px;color:var(--sub);margin-bottom:18px;}
+  .timer-clock{font-size:56px;font-weight:700;letter-spacing:1px;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1;}
+  .timer-adjust{display:flex;align-items:center;justify-content:center;gap:18px;margin:16px 0 22px;}
+  .timer-adjust .step{
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--bg);
+    font-size:22px;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;
+  }
+  .timer-adjust .step:active{background:var(--accent-soft);color:var(--accent);}
+  .timer-adjust .step.disabled{opacity:.3;pointer-events:none;}
+  .timer-adjust .len{font-size:14px;color:var(--sub);min-width:64px;}
+  .timer-btns{display:flex;flex-direction:column;gap:10px;}
+  .timer-btns .btn{
+    padding:13px;border-radius:15px;font-size:16px;font-weight:600;cursor:pointer;user-select:none;border:none;
+  }
+  .btn.primary{background:var(--accent);color:#fff;}
+  .btn.primary:active{transform:scale(.98);}
+  .btn.ghost{background:var(--bg);color:var(--ink);}
+  .btn.danger{background:transparent;color:var(--sub);font-weight:500;font-size:14px;padding:6px;}
+  .btn.danger:active{color:var(--danger);}
+
+  /* ---- 时间轴视图 ---- */
+  .timeline-wrap{padding:8px 0 12px;}
+  .tl-empty{text-align:center;color:var(--sub);font-size:14px;margin-top:70px;line-height:2;}
+  .tl-empty .big{font-size:44px;display:block;margin-bottom:8px;}
+  .tl-grid{position:relative;margin:6px 0 22px;}
+  .tl-hour{position:absolute;left:0;right:0;display:flex;align-items:flex-start;}
+  .tl-hour .hh{width:44px;flex:0 0 auto;font-size:11px;color:var(--sub);transform:translateY(-6px);}
+  .tl-hour .ln{flex:1 1 auto;border-top:1px dashed var(--line);margin-top:0;}
+  .tl-blocks{position:absolute;left:52px;right:6px;top:0;bottom:0;}
+  .tl-block{
+    position:absolute;left:0;right:0;border-radius:10px;padding:5px 9px;overflow:hidden;
+    color:#fff;font-size:12px;line-height:1.3;box-shadow:0 2px 6px rgba(40,45,80,.14);
+  }
+  .tl-block b{font-weight:600;}
+  .tl-block .bt{opacity:.85;font-size:11px;}
+  .tl-stats{margin-top:6px;}
+  .tl-stats h3{font-size:14px;font-weight:700;margin:0 0 10px;color:var(--ink);}
+  .tl-stat-row{display:flex;align-items:center;gap:9px;margin-bottom:12px;}
+  .tl-dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;}
+  .tl-stat-body{flex:1 1 auto;min-width:0;}
+  .tl-stat-top{display:flex;justify-content:space-between;font-size:13px;color:var(--ink);margin-bottom:4px;}
+  .tl-stat-top .mins{color:var(--sub);font-size:12px;flex:0 0 auto;margin-left:8px;}
+  .tl-bar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;}
+  .tl-bar-fill{height:100%;border-radius:4px;}
+  .tl-total{text-align:center;font-size:13px;color:var(--sub);margin-top:2px;}
+</style>
+</head>
+  .cal-mask{
+    position:fixed;inset:0;background:rgba(32,35,46,.28);backdrop-filter:blur(2px);
+    display:flex;align-items:flex-end;justify-content:center;z-index:50;
+    opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .cal-mask.show{opacity:1;pointer-events:auto;}
+  .cal-sheet{
+    width:100%;max-width:480px;background:var(--card);border-radius:22px 22px 0 0;
+    padding:18px 18px calc(20px + var(--safe-bottom));box-shadow:0 -8px 30px rgba(40,45,80,.14);
+    transform:translateY(100%);transition:transform .26s cubic-bezier(.22,.61,.36,1);
+  }
+  .cal-mask.show .cal-sheet{transform:translateY(0);}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .cal-title{font-size:17px;font-weight:700;}
+  .cal-nav{display:flex;gap:8px;}
+  .cal-nav .arrow{
+    width:34px;height:34px;border-radius:50%;background:var(--bg);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;color:var(--sub);cursor:pointer;
+    font-size:16px;user-select:none;transition:.15s;
+  }
+  .cal-nav .arrow:active{background:var(--accent-soft);color:var(--accent);}
+  .cal-week{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px;}
+  .cal-week span{text-align:center;font-size:12px;color:var(--sub);padding:4px 0;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-cell{
+    aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:14px;border-radius:12px;cursor:pointer;position:relative;color:var(--ink);
+    user-select:none;transition:.12s;
+  }
+  .cal-cell.other{color:#c9ccd8;}
+  .cal-cell:active{background:var(--accent-soft);}
+  .cal-cell.today{color:var(--accent);font-weight:700;}
+  .cal-cell.sel{background:var(--accent);color:#fff;font-weight:700;}
+  .cal-cell.sel.today{color:#fff;}
+  .cal-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);position:absolute;bottom:6px;}
+  .cal-cell.sel .cal-dot{background:#fff;}
+  .cal-foot{display:flex;justify-content:center;margin-top:14px;}
+  .cal-today-btn{
+    font-size:14px;font-weight:600;color:var(--accent);background:var(--accent-soft);
+    padding:9px 22px;border-radius:14px;cursor:pointer;user-select:none;
+  }
 </style>
 </head>
 <body>
@@ -173,6 +284,7 @@
       <h1 id="listTitle">日程</h1>
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="count" id="countLabel"></span>
+        <span class="mode-toggle" id="modeToggle" title="切换 清单 / 时间轴"></span>
         <span id="backupBtn" title="备份 / 恢复" style="font-size:18px;cursor:pointer;opacity:.5;user-select:none;">⤓</span>
       </div>
     </div>
@@ -185,6 +297,41 @@
     </div>
   </header>
 
+  <!-- 月历弹层：点日期文字展开，可翻月、点日期跳转 -->
+  <div class="cal-mask" id="calMask">
+    <div class="cal-sheet" id="calSheet">
+      <div class="cal-head">
+        <div class="cal-title" id="calTitle">2026年7月</div>
+        <div class="cal-nav">
+          <div class="arrow" id="calPrev">‹</div>
+          <div class="arrow" id="calNext">›</div>
+        </div>
+      </div>
+      <div class="cal-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-foot"><div class="cal-today-btn" id="calToday">回到今天</div></div>
+    </div>
+  </div>
+
+  <!-- 番茄钟计时浮层 -->
+  <div class="timer-mask" id="timerMask">
+    <div class="timer-card">
+      <div class="timer-task" id="timerTask">任务</div>
+      <div class="timer-sub" id="timerSub">专注一段，别被打断</div>
+      <div class="timer-clock" id="timerClock">25:00</div>
+      <div class="timer-adjust" id="timerAdjust">
+        <div class="step" id="timerMinus">−</div>
+        <div class="len" id="timerLen">25 分钟</div>
+        <div class="step" id="timerPlus">＋</div>
+      </div>
+      <div class="timer-btns">
+        <button class="btn primary" id="timerMain">开始专注</button>
+        <button class="btn ghost" id="timerDone" style="display:none;">结束并记录</button>
+        <button class="btn danger" id="timerGiveup">放弃</button>
+      </div>
+    </div>
+  </div>
+
   <div class="viewport" id="viewport">
     <div class="track" id="track"></div>
     <div class="single" id="single"></div>
@@ -195,8 +342,12 @@
       <input id="timeInput" type="datetime-local" />
       <span class="clear-time" id="clearTime">清除</span>
     </div>
+    <div class="picker-row" id="parentRow" style="overflow-x:auto;">
+      <div id="parentChips" style="display:flex;gap:8px;align-items:center;white-space:nowrap;"></div>
+    </div>
     <div class="input-row">
       <input id="taskInput" class="main-input" type="text" placeholder="添加任务，回车提交…" autocomplete="off" />
+      <button class="icon-btn" id="parentBtn" title="挂到上级目标">🎯</button>
       <button class="icon-btn" id="timeBtn" title="设置时间">🕐</button>
       <button class="submit" id="submitBtn">＋</button>
     </div>
@@ -223,10 +374,11 @@
 
 <script>
 const STORE_KEY = "shiguang.v3";
+const TIMER_KEY = "shiguang.timer";   // 活动中的番茄钟，刷新/切后台不丢
 const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
 const VIEW_TITLE = { day:"日程", week:"周计划", month:"月计划", year:"年度目标" };
 const VIEW_PLACEHOLDER = {
-  day:"添加任务，回车提交…", week:"这周要推进的事…",
+  day:"今天想做点什么？回车添加…", week:"这周要推进的事…",
   month:"这个月的计划…", year:"今年要实现的目标…"
 };
 
@@ -235,13 +387,16 @@ const VIEW_PLACEHOLDER = {
    day:  { lists:[ {name, tasks:[]} ] },   // 可滑动多清单；每条 day 任务带 date:"YYYY-MM-DD"
    week: { tasks:[] }, month:{ tasks:[] }, year:{ tasks:[] }
  }
- task = { id, text, done, createdAt, due(可空), date(仅日程), children:[子任务id], parentText(可空) }
+ task = { id, text, done, createdAt, due(可空), date(仅日程), children:[子任务id], parentText(可空),
+          sessions:[{start,end,focusSec}] 专注记录 }
 */
 let state = load();
 let view = "day";      // day | week | month | year
 let current = 0;       // 日程内当前清单索引
 let useTime = false;   // 是否展开时间选择
 let currentDate = todayStr();   // 日程当前查看的日期
+let dayMode = "list";  // 日程视图：list 清单 | timeline 时间轴
+let pendingParentId = null;   // 新任务待挂靠的上级目标 id
 
 /* ---------- 日期工具 ---------- */
 function pad2(n){ return String(n).padStart(2,"0"); }
@@ -273,7 +428,7 @@ function seed(){
   let n = 0;
   const id = ()=> "seed-"+(n++);           // 稳定 id，便于父子挂钩
   const mk = (text, extra={})=> Object.assign(
-    { id:id(), text, done:false, createdAt:Date.now()-(1000*n), due:null, parentText:null, children:[] }, extra);
+    { id:id(), text, done:false, createdAt:Date.now()-(1000*n), due:null, parentText:null, children:[], sessions:[] }, extra);
 
   // —— 日程：把最细的执行项放进「今天 / 工作 / 生活」——
   const dToday = s.day.lists[0].tasks;   // 今天
@@ -285,15 +440,18 @@ function seed(){
   const today = todayStr();
   const todayAt=(h,m)=>{ const d=new Date(); d.setHours(h,m,0,0);
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}`; };
+  // 造几段"今天"的专注记录，让时间轴一打开就有内容
+  const atMs=(h,m)=>{ const d=new Date(); d.setHours(h,m,0,0); return d.getTime(); };
+  const sess=(sh,sm,mins)=>({ start:atMs(sh,sm), end:atMs(sh,sm)+mins*60000, focusSec:mins*60 });
 
   // 读书线的叶子（日程任务带 date）
-  const read30 = mk("读《原则》30页", { parentText:"这周读完《原则》上半", due:todayAt(21,0), done:true, date:today });
+  const read30 = mk("读《原则》30页", { parentText:"这周读完《原则》上半", due:todayAt(21,0), done:true, date:today, sessions:[sess(9,10,50), sess(10,20,25)] });
   const readNote = mk("整理2页读书笔记", { parentText:"这周读完《原则》上半", due:todayAt(21,40), date:today });
   // 跑步线的叶子
-  const run1 = mk("晨跑 5 公里", { parentText:"本周跑步3次", done:true, date:today });
+  const run1 = mk("晨跑 5 公里", { parentText:"本周跑步3次", done:true, date:today, sessions:[sess(7,0,30)] });
   const run2 = mk("晚间快走 40 分钟", { parentText:"本周跑步3次", due:todayAt(19,30), date:today });
   // 作品集线的叶子
-  const prd = mk("写完 PRD 初稿第一章", { parentText:"完成作品集2个案例", due:todayAt(15,0), date:today });
+  const prd = mk("写完 PRD 初稿第一章", { parentText:"完成作品集2个案例", due:todayAt(15,0), date:today, sessions:[sess(14,0,25), sess(15,0,45)] });
   dToday.push(read30, readNote, run2);
   dWork.push(prd);
   dLife.push(run1);
@@ -325,12 +483,16 @@ function load(){
   }catch(e){}
   return seed();   // 首次打开：载入示例目标树
 }
-// 迁移：给还没有 date 的日程任务补上"今天"，保证旧数据平滑升级、不丢
+// 迁移：给还没有 date 的日程任务补上"今天"、给所有任务补 sessions，保证旧数据平滑升级、不丢
 function migrate(d){
   const t=todayStr();
   try{
     (d.day.lists||[]).forEach(l=>(l.tasks||[]).forEach(task=>{
       if(!task.date) task.date=t;
+      if(!task.sessions) task.sessions=[];
+    }));
+    ["week","month","year"].forEach(v=>(d[v]&&d[v].tasks||[]).forEach(task=>{
+      if(!task.sessions) task.sessions=[];
     }));
   }catch(e){}
   return d;
@@ -388,6 +550,28 @@ const dateLabelEl=document.getElementById("dateLabel");
 const datePrevEl=document.getElementById("datePrev");
 const dateNextEl=document.getElementById("dateNext");
 const datePickerEl=document.getElementById("datePicker");
+const calMaskEl=document.getElementById("calMask");
+const calSheetEl=document.getElementById("calSheet");
+const calTitleEl=document.getElementById("calTitle");
+const calGridEl=document.getElementById("calGrid");
+const calPrevEl=document.getElementById("calPrev");
+const calNextEl=document.getElementById("calNext");
+const calTodayEl=document.getElementById("calToday");
+const modeToggleEl=document.getElementById("modeToggle");
+const parentBtn=document.getElementById("parentBtn");
+const parentRow=document.getElementById("parentRow");
+const parentChipsEl=document.getElementById("parentChips");
+const timerMaskEl=document.getElementById("timerMask");
+const timerTaskEl=document.getElementById("timerTask");
+const timerSubEl=document.getElementById("timerSub");
+const timerClockEl=document.getElementById("timerClock");
+const timerLenEl=document.getElementById("timerLen");
+const timerMinusEl=document.getElementById("timerMinus");
+const timerPlusEl=document.getElementById("timerPlus");
+const timerAdjustEl=document.getElementById("timerAdjust");
+const timerMainEl=document.getElementById("timerMain");
+const timerDoneEl=document.getElementById("timerDone");
+const timerGiveupEl=document.getElementById("timerGiveup");
 
 /* ---------- 当前任务集合 ---------- */
 function activeTasks(){
@@ -397,9 +581,11 @@ function activeTasks(){
 /* ---------- 渲染顶部 ---------- */
 function renderTabs(){
   if(view!=="day"){ tabsEl.classList.add("hidden"); datebarEl.classList.add("hidden"); return; }
-  tabsEl.classList.remove("hidden");
   datebarEl.classList.remove("hidden");
-  dateLabelEl.textContent=fmtDateLabel(currentDate);
+  dateLabelEl.innerHTML=fmtDateLabel(currentDate)+' <span style="color:var(--sub);font-size:12px;">▾</span>';
+  // 时间轴模式下清单标签无意义（跨清单汇总），隐藏之
+  if(dayMode==="timeline"){ tabsEl.classList.add("hidden"); return; }
+  tabsEl.classList.remove("hidden");
   tabsEl.innerHTML="";
   state.day.lists.forEach((list,i)=>{
     const t=document.createElement("div");
@@ -514,6 +700,23 @@ function renderTask(task, listRef, ownerView){
     b.onclick=(e)=>{ e.stopPropagation(); breakdown(task, ownerView); };
     tags.appendChild(b);
   }
+  // 专注：仅日程叶子任务、且看的是今天，才给"开始番茄钟"入口
+  if(ownerView==="day" && !hasKids){
+    const focusSec=(task.sessions||[]).reduce((s,x)=>s+(x.focusSec||0),0);
+    if(currentDate===todayStr()){
+      const f=document.createElement("span");
+      f.className="chip focus";
+      f.textContent="▶ 专注";
+      f.onclick=(e)=>{ e.stopPropagation(); openTimer(task); };
+      tags.appendChild(f);
+    }
+    if(focusSec>0){
+      const s=document.createElement("span");
+      s.className="chip focused";
+      s.textContent="🍅 "+fmtDur(focusSec);
+      tags.appendChild(s);
+    }
+  }
   if(tags.children.length) body.appendChild(tags);
 
   const del=document.createElement("div");
@@ -599,19 +802,140 @@ function renderSingle(){
     "还没有内容<br>"+({week:"从年/月目标拆解，或直接添加",month:"从年度目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||""));
 }
 
+/* ---------- 时间轴：把某天的专注 session 按墙钟排布 ---------- */
+// 冷色系调色板，任务 id 稳定哈希取色，跟主色协调
+const TL_COLORS=["#6b7fd0","#4fa3c7","#5bb8a6","#8a86d8","#5c9dd6","#59b3b0","#7c95d4","#6aa9c9"];
+function colorOf(id){
+  let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0;
+  return TL_COLORS[h%TL_COLORS.length];
+}
+// 收集某天（YYYY-MM-DD）所有 session，附带所属任务
+function daySessions(dateStr_){
+  const out=[];
+  state.day.lists.forEach(l=>(l.tasks||[]).forEach(t=>{
+    (t.sessions||[]).forEach(s=>{
+      if(dateStr(new Date(s.start))===dateStr_) out.push({ task:t, ...s });
+    });
+  }));
+  return out.sort((a,b)=>a.start-b.start);
+}
+function renderTimeline(){
+  const sessions=daySessions(currentDate);
+  const wrap=document.createElement("div");
+  wrap.className="timeline-wrap";
+  if(!sessions.length){
+    singleEl.innerHTML='<div class="tl-empty"><span class="big">🍅</span>今天还没有专注记录<br>点任务上的「▶ 专注」开始第一段番茄钟</div>';
+    return;
+  }
+  // 自动适配范围：最早开始 → 最晚结束，上下各留 ~30 分钟，整点对齐
+  const minS=Math.min(...sessions.map(s=>s.start));
+  const maxE=Math.max(...sessions.map(s=>s.end));
+  const startH=Math.max(0, new Date(minS).getHours() - (new Date(minS).getMinutes()<30?1:0));
+  let endH=new Date(maxE).getHours() + (new Date(maxE).getMinutes()>0?1:0) + (new Date(maxE).getMinutes()>=30?1:0);
+  endH=Math.min(24, Math.max(endH, startH+1));
+  const base=new Date(currentDate+"T00:00:00"); base.setHours(startH,0,0,0);
+  const top=base.getTime();
+  const span=(endH-startH)*3600000;    // 总跨度(ms)
+  const PX_PER_HOUR=64;
+  const gridH=(endH-startH)*PX_PER_HOUR;
+
+  const grid=document.createElement("div");
+  grid.className="tl-grid"; grid.style.height=gridH+"px";
+  // 整点刻度线
+  for(let h=startH;h<=endH;h++){
+    const row=document.createElement("div");
+    row.className="tl-hour";
+    row.style.top=((h-startH)*PX_PER_HOUR)+"px";
+    row.innerHTML=`<span class="hh">${String(h).padStart(2,"0")}:00</span><span class="ln"></span>`;
+    grid.appendChild(row);
+  }
+  // session 色块
+  const blocks=document.createElement("div");
+  blocks.className="tl-blocks"; blocks.style.height=gridH+"px";
+  sessions.forEach(s=>{
+    const b=document.createElement("div");
+    b.className="tl-block";
+    const y=(s.start-top)/span*gridH;
+    let h=(s.end-s.start)/span*gridH;
+    if(h<18) h=18;   // 太短也要看得见
+    b.style.top=y+"px"; b.style.height=h+"px";
+    b.style.background=colorOf(s.task.id);
+    const t1=new Date(s.start), t2=new Date(s.end);
+    const hm=d=>`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    b.innerHTML=`<b>${s.task.text}</b> <span class="bt">${hm(t1)}–${hm(t2)}</span>`;
+    blocks.appendChild(b);
+  });
+  grid.appendChild(blocks);
+  wrap.appendChild(grid);
+
+  // 底部专注统计：按任务合计
+  const byTask={};
+  sessions.forEach(s=>{ (byTask[s.task.id] ||= {task:s.task, sec:0}).sec+=s.focusSec||0; });
+  const rows=Object.values(byTask).sort((a,b)=>b.sec-a.sec);
+  const totalSec=rows.reduce((s,r)=>s+r.sec,0);
+  const stats=document.createElement("div");
+  stats.className="tl-stats";
+  stats.innerHTML="<h3>专注分布</h3>";
+  rows.forEach(r=>{
+    const pct=totalSec? Math.round(r.sec/totalSec*100):0;
+    const col=colorOf(r.task.id);
+    const row=document.createElement("div");
+    row.className="tl-stat-row";
+    row.innerHTML=`<div class="tl-dot" style="background:${col}"></div>
+      <div class="tl-stat-body">
+        <div class="tl-stat-top"><span>${r.task.text}</span><span class="mins">${fmtDur(r.sec)} · ${pct}%</span></div>
+        <div class="tl-bar"><div class="tl-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      </div>`;
+    stats.appendChild(row);
+  });
+  const tot=document.createElement("div");
+  tot.className="tl-total"; tot.textContent="共 "+fmtDur(totalSec)+" · "+rows.length+" 个任务";
+  stats.appendChild(tot);
+  wrap.appendChild(stats);
+
+  singleEl.innerHTML="";
+  singleEl.appendChild(wrap);
+}
+
+/* ---------- 清单 / 时间轴 模式切换 ---------- */
+const ICON_LIST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
+const ICON_TL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><circle cx="5" cy="8" r="2"/><circle cx="5" cy="16" r="2"/><path d="M9 8h11M9 16h7"/></svg>';
+function syncModeToggle(){
+  if(view!=="day"){ modeToggleEl.style.display="none"; return; }
+  modeToggleEl.style.display="flex";
+  // 图标显示"另一个模式"，点它就切过去
+  modeToggleEl.innerHTML = dayMode==="list" ? ICON_TL : ICON_LIST;
+  modeToggleEl.classList.toggle("on", dayMode==="timeline");
+  modeToggleEl.title = dayMode==="list" ? "看时间轴" : "回到清单";
+}
+modeToggleEl.onclick=()=>{ dayMode = dayMode==="list" ? "timeline" : "list"; rerender(); };
+
 function rerender(){
-  if(view==="day"){
+  if(view==="day" && dayMode==="timeline"){
+    // 时间轴：借用 single 容器渲染，隐藏可滑动的清单轨道
+    trackEl.style.display="none"; singleEl.style.display="block";
+    renderTimeline();
+  }else if(view==="day"){
     trackEl.style.display=""; singleEl.style.display="none";
+    // 日程视图：输入框提示随所选日期变化
+    const isToday = currentDate===todayStr();
+    inputEl.placeholder = isToday ? "今天想做点什么？回车添加…"
+      : (currentDate===shiftDate(todayStr(),1) ? "明天要做点什么？回车添加…"
+      : `安排「${fmtDateLabel(currentDate).split(" · ").pop()}」的任务，回车添加…`);
     renderDay();
   }else{
     trackEl.style.display="none"; singleEl.style.display="block";
     renderSingle();
   }
-  renderTabs(); updateHeader();
+  renderTabs(); updateHeader(); syncModeToggle();
 }
 
 function updateHeader(){
-  if(view==="day"){
+  if(view==="day" && dayMode==="timeline"){
+    titleEl.textContent="时间轴";
+    const secs=daySessions(currentDate).reduce((s,x)=>s+(x.focusSec||0),0);
+    countEl.textContent= secs>0? "共专注 "+fmtDur(secs) : "";
+  }else if(view==="day"){
     const list=state.day.lists[current];
     titleEl.textContent=list.name;
     const todays=dayTasksOf(list);
@@ -622,6 +946,14 @@ function updateHeader(){
     const arr=state[view].tasks, done=arr.filter(t=>t.done).length;
     countEl.textContent= arr.length? `${done}/${arr.length} 已完成` : "";
   }
+}
+
+/* ---------- 时长格式：秒 → Xh Ym / Ym ---------- */
+function fmtDur(sec){
+  const m=Math.round(sec/60);
+  if(m<60) return m+" 分钟";
+  const h=Math.floor(m/60), mm=m%60;
+  return mm? `${h} 小时 ${mm} 分` : `${h} 小时`;
 }
 
 /* ---------- 时间格式 ---------- */
@@ -643,7 +975,7 @@ function breakdown(task, ownerView){
   const nv=nextViewFor(ownerView); if(!nv) return;
   const text=(prompt(`把「${task.text}」拆解为一条${VIEW_TITLE[nv]}任务：`, "")||"").trim();
   if(!text) return;
-  const child={ id:uid(), text, done:false, createdAt:Date.now(), due:null, parentText:task.text, children:[] };
+  const child={ id:uid(), text, done:false, createdAt:Date.now(), due:null, parentText:task.text, children:[], sessions:[] };
   if(nv==="day"){ child.date=currentDate; state.day.lists[current].tasks.push(child); }
   else{ state[nv].tasks.push(child); }
   if(!task.children) task.children=[];
@@ -657,14 +989,24 @@ function addTask(){
   const text=inputEl.value.trim();
   if(!text) return;
   const task={ id:uid(), text, done:false, createdAt:Date.now(),
-    due:(useTime&&timeInput.value)? timeInput.value : null, parentText:null, children:[] };
+    due:(useTime&&timeInput.value)? timeInput.value : null, parentText:null, children:[], sessions:[] };
   if(view==="day") task.date=currentDate;   // 日程任务归属到当前查看的日期
+  // 挂靠上级：把这条任务挂到某个更高层目标下，进度自动上卷
+  if(view==="day" && pendingParentId){
+    const parent=taskById(pendingParentId);
+    if(parent){
+      task.parentText=parent.text;
+      if(!parent.children) parent.children=[];
+      parent.children.push(task.id);
+    }
+  }
   activeTasks().push(task);
   inputEl.value="";
-  // 加完任务后收起时间选择器，恢复干净的输入栏
+  // 加完任务后收起时间/上级选择器，恢复干净的输入栏
   useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); timeInput.value="";
+  pendingParentId=null; parentRow.classList.remove("show"); parentBtn.classList.remove("on");
   save(); rerender();
-  if(view==="day") requestAnimationFrame(()=>{ if(trackEl.children[current])trackEl.children[current].scrollTop=0; });
+  if(view==="day" && dayMode==="list") requestAnimationFrame(()=>{ if(trackEl.children[current])trackEl.children[current].scrollTop=0; });
   else singleEl.scrollTop=0;
 }
 function addList(){
@@ -688,6 +1030,35 @@ timeBtn.onclick=()=>{
 };
 clearTime.onclick=()=>{ timeInput.value=""; useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); };
 
+/* ---------- 挂靠上级：选一个更高层目标 ---------- */
+function buildParentChips(){
+  parentChipsEl.innerHTML="";
+  const none=document.createElement("span");
+  none.className="chip"+(pendingParentId?"":" focused");
+  none.textContent="无上级";
+  none.style.cursor="pointer";
+  none.onclick=()=>{ pendingParentId=null; buildParentChips(); };
+  parentChipsEl.appendChild(none);
+  const label={week:"周",month:"月",year:"年"};
+  ["year","month","week"].forEach(v=>{   // 年→月→周，方便按层级挑
+    state[v].tasks.forEach(t=>{
+      const c=document.createElement("span");
+      const on=pendingParentId===t.id;
+      c.className="chip"+(on?" focused":"");
+      c.style.cursor="pointer";
+      c.innerHTML=`<b style="opacity:.6;font-weight:600;">${label[v]}</b> ${t.text}`;
+      c.onclick=()=>{ pendingParentId = on? null : t.id; buildParentChips(); };
+      parentChipsEl.appendChild(c);
+    });
+  });
+}
+parentBtn.onclick=()=>{
+  const show=!parentRow.classList.contains("show");
+  parentRow.classList.toggle("show",show);
+  parentBtn.classList.toggle("on",show);
+  if(show) buildParentChips();
+};
+
 submitEl.onclick=addTask;
 inputEl.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); });
 
@@ -702,12 +1073,12 @@ function goTo(i){
 const vp=document.getElementById("viewport");
 let startX=0,startY=0,deltaX=0,dragging=false,horizontal=null;
 vp.addEventListener("touchstart",e=>{
-  if(view!=="day") return;
+  if(view!=="day"||dayMode!=="list") return;
   const t=e.touches[0]; startX=t.clientX; startY=t.clientY; deltaX=0; dragging=true; horizontal=null;
   trackEl.style.transition="none";
 },{passive:true});
 vp.addEventListener("touchmove",e=>{
-  if(!dragging||view!=="day") return;
+  if(!dragging||view!=="day"||dayMode!=="list") return;
   const t=e.touches[0], dx=t.clientX-startX, dy=t.clientY-startY;
   if(horizontal===null) horizontal=Math.abs(dx)>Math.abs(dy)+4;
   if(!horizontal) return;
@@ -727,6 +1098,9 @@ function switchView(v){
   view=v;
   [...navEl.children].forEach(it=>it.classList.toggle("active",it.dataset.view===v));
   inputEl.placeholder=VIEW_PLACEHOLDER[v];
+  // 离开日程时收起"挂靠上级"选择器；只有日程才显示该按钮
+  parentBtn.style.display = v==="day" ? "flex" : "none";
+  if(v!=="day"){ pendingParentId=null; parentRow.classList.remove("show"); parentBtn.classList.remove("on"); }
   rerender();
 }
 navEl.querySelectorAll(".nav-item").forEach(it=>{
@@ -741,23 +1115,179 @@ function goToDate(str){
 }
 datePrevEl.onclick=()=>goToDate(shiftDate(currentDate,-1));
 dateNextEl.onclick=()=>goToDate(shiftDate(currentDate,1));
-// 点日期文字：能回今天就先回今天，否则打开原生日期选择器
-dateLabelEl.onclick=()=>{
-  if(currentDate!==todayStr()){ goToDate(todayStr()); return; }
-  datePickerEl.value=currentDate;
-  if(datePickerEl.showPicker){ try{ datePickerEl.showPicker(); return; }catch(e){} }
-  datePickerEl.click();
-};
+// 点日期文字：展开月历弹层，可翻月 + 点日期跳转
+dateLabelEl.onclick=()=>openCalendar();
 datePickerEl.onchange=()=>{ if(datePickerEl.value) goToDate(datePickerEl.value); };
+
+/* ---------- 月历弹层 ---------- */
+let calCursor = currentDate;   // 月历当前显示的月份（取该月任意一天）
+// 统计某天各清单里有多少任务，用于日历圆点
+function dayHasTasks(str){
+  return state.day.lists.some(l => (l.tasks||[]).some(t => t.date===str));
+}
+function renderCalendar(){
+  const cur=new Date(calCursor+"T00:00:00");
+  const y=cur.getFullYear(), m=cur.getMonth();
+  calTitleEl.textContent=`${y}年${m+1}月`;
+  const first=new Date(y,m,1);
+  const startDow=first.getDay();               // 本月1号是周几
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const prevDays=new Date(y,m,0).getDate();    // 上月天数
+  const today=todayStr();
+  calGridEl.innerHTML="";
+  const cells=[];
+  // 上月补白
+  for(let i=startDow-1;i>=0;i--) cells.push({d:prevDays-i, mm:m-1, yy:y, other:true});
+  // 本月
+  for(let d=1;d<=daysInMonth;d++) cells.push({d, mm:m, yy:y, other:false});
+  // 下月补白，凑满整行
+  while(cells.length%7!==0) cells.push({d:cells.length-startDow-daysInMonth+1, mm:m+1, yy:y, other:true});
+  cells.forEach(c=>{
+    const cd=new Date(c.yy, c.mm, c.d);
+    const str=dateStr(cd);
+    const cell=document.createElement("div");
+    cell.className="cal-cell"+(c.other?" other":"")+(str===today?" today":"")+(str===currentDate?" sel":"");
+    cell.textContent=c.d;
+    if(dayHasTasks(str)){ const dot=document.createElement("div"); dot.className="cal-dot"; cell.appendChild(dot); }
+    cell.onclick=()=>{ closeCalendar(); goToDate(str); };
+    calGridEl.appendChild(cell);
+  });
+}
+function openCalendar(){ calCursor=currentDate; renderCalendar(); calMaskEl.classList.add("show"); }
+function closeCalendar(){ calMaskEl.classList.remove("show"); }
+calPrevEl.onclick=()=>{ const d=new Date(calCursor+"T00:00:00"); d.setMonth(d.getMonth()-1); calCursor=dateStr(d); renderCalendar(); };
+calNextEl.onclick=()=>{ const d=new Date(calCursor+"T00:00:00"); d.setMonth(d.getMonth()+1); calCursor=dateStr(d); renderCalendar(); };
+calTodayEl.onclick=()=>{ closeCalendar(); goToDate(todayStr()); };
+calMaskEl.onclick=(e)=>{ if(e.target===calMaskEl) closeCalendar(); };
 
 /* ---------- 键盘（桌面预览） ---------- */
 window.addEventListener("keydown",e=>{
   if(document.activeElement===inputEl||document.activeElement===timeInput) return;
-  if(view==="day"){ if(e.key==="ArrowRight")goTo(current+1); if(e.key==="ArrowLeft")goTo(current-1); }
+  if(view==="day"&&dayMode==="list"){ if(e.key==="ArrowRight")goTo(current+1); if(e.key==="ArrowLeft")goTo(current-1); }
 });
+
+/* ---------- 番茄钟计时 ---------- */
+let timerState=null;   // { taskId, durationMin, startedAt, accumBeforePauseSec, paused } | null
+let timerTick=null;    // setInterval 句柄
+const MIN_LEN=5, MAX_LEN=120;
+
+function loadTimer(){
+  try{ const raw=localStorage.getItem(TIMER_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return null;
+}
+function persistTimer(){
+  try{ timerState? localStorage.setItem(TIMER_KEY, JSON.stringify(timerState)) : localStorage.removeItem(TIMER_KEY); }catch(e){}
+}
+// 已专注秒数：暂停时只算到暂停前累计；运行时再加上本段
+function elapsedSec(){
+  if(!timerState) return 0;
+  let s=timerState.accumBeforePauseSec||0;
+  if(!timerState.paused && timerState.startedAt) s += Math.floor((Date.now()-timerState.startedAt)/1000);
+  return s;
+}
+function remainSec(){ return Math.max(0, timerState.durationMin*60 - elapsedSec()); }
+
+function openTimer(task){
+  timerState = loadTimer();
+  // 若已有别的任务在计时，优先恢复那个；否则给当前任务新建一个待开始的计时
+  if(!timerState || timerState.taskId!==task.id){
+    if(timerState){ /* 有进行中的其它计时，先不覆盖，直接恢复展示它 */ }
+    else timerState = { taskId:task.id, durationMin:25, startedAt:null, accumBeforePauseSec:0, paused:true };
+  }
+  persistTimer();
+  timerMaskEl.classList.add("show");
+  refreshTimerUI();
+  startTick();
+}
+function closeTimer(){ timerMaskEl.classList.remove("show"); stopTick(); }
+function startTick(){ stopTick(); timerTick=setInterval(refreshTimerUI, 1000); }
+function stopTick(){ if(timerTick){ clearInterval(timerTick); timerTick=null; } }
+
+function refreshTimerUI(){
+  if(!timerState){ closeTimer(); return; }
+  const task=taskById(timerState.taskId);
+  timerTaskEl.textContent = task? task.text : "任务";
+  const running = !timerState.paused && timerState.startedAt;
+  const notStarted = !timerState.startedAt && timerState.paused;
+  const rem=remainSec();
+  const mm=String(Math.floor(rem/60)).padStart(2,"0");
+  const ss=String(rem%60).padStart(2,"0");
+  timerClockEl.textContent=`${mm}:${ss}`;
+  timerLenEl.textContent=timerState.durationMin+" 分钟";
+  // 时长只在"还没开始"时可调
+  timerAdjustEl.style.opacity = notStarted? "1":".4";
+  timerMinusEl.classList.toggle("disabled", !notStarted);
+  timerPlusEl.classList.toggle("disabled", !notStarted);
+  // 按钮态
+  if(notStarted){
+    timerMainEl.textContent="开始专注"; timerMainEl.style.display="";
+    timerDoneEl.style.display="none";
+    timerSubEl.textContent="专注一段，别被打断";
+  }else if(running){
+    timerMainEl.textContent="暂停"; timerMainEl.style.display="";
+    timerDoneEl.style.display="";
+    timerSubEl.textContent="专注中…";
+  }else{ // 暂停中
+    timerMainEl.textContent="继续"; timerMainEl.style.display="";
+    timerDoneEl.style.display="";
+    timerSubEl.textContent="已暂停 · 已专注 "+fmtDur(elapsedSec());
+  }
+  // 倒计时归零 → 自动结束记录
+  if(running && rem<=0){ finishTimer(true); }
+}
+function adjustLen(delta){
+  if(!timerState || timerState.startedAt) return;
+  timerState.durationMin=Math.min(MAX_LEN, Math.max(MIN_LEN, timerState.durationMin+delta));
+  persistTimer(); refreshTimerUI();
+}
+timerMinusEl.onclick=()=>adjustLen(-5);
+timerPlusEl.onclick=()=>adjustLen(5);
+
+timerMainEl.onclick=()=>{
+  if(!timerState) return;
+  if(!timerState.startedAt){                 // 开始
+    timerState.startedAt=Date.now(); timerState.paused=false;
+  }else if(timerState.paused){                // 继续
+    timerState.startedAt=Date.now(); timerState.paused=false;
+  }else{                                      // 暂停：累计已专注秒数
+    timerState.accumBeforePauseSec=elapsedSec(); timerState.paused=true; timerState.startedAt=null;
+  }
+  persistTimer(); refreshTimerUI();
+};
+// 结束并记录一段专注
+function finishTimer(auto){
+  if(!timerState){ closeTimer(); return; }
+  const task=taskById(timerState.taskId);
+  const focusSec=elapsedSec();
+  if(task && focusSec>=30){   // 太短(<30秒)不记，避免误触
+    if(!task.sessions) task.sessions=[];
+    const end=Date.now();
+    task.sessions.push({ start:end-focusSec*1000, end, focusSec });
+    save();
+  }
+  timerState=null; persistTimer(); closeTimer(); rerender();
+  if(auto && navigator.vibrate) try{ navigator.vibrate(200); }catch(e){}
+}
+timerDoneEl.onclick=()=>finishTimer(false);
+timerGiveupEl.onclick=()=>{
+  if(!timerState) return closeTimer();
+  const started=!!timerState.startedAt;
+  if(started && !confirm("放弃这段专注？已进行的时间不会被记录。")) return;
+  timerState=null; persistTimer(); closeTimer(); rerender();
+};
+timerMaskEl.onclick=(e)=>{ if(e.target===timerMaskEl) closeTimer(); };  // 点空白只收起，不丢弃计时
 
 /* ---------- 启动 ---------- */
 switchView("day");
+// 若有未结束的番茄钟（刷新/切后台回来），自动恢复浮层
+(function resumeTimer(){
+  const t=loadTimer();
+  if(t && taskById(t.taskId)){
+    timerState=t;
+    timerMaskEl.classList.add("show");
+    refreshTimerUI(); startTick();
+  }
+})();
 
 /* ---------- 备份：导出 / 导入 ---------- */
 function exportData(){
