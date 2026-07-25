@@ -1,10 +1,15 @@
 // 步步 —— 离线缓存 Service Worker
-const CACHE = "shiguang-v2";
+const CACHE = "shiguang-v3";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS).catch(() => {})));
+});
+
+// 页面通知有新版本 → 立即接管，触发 controllerchange 让页面自动刷新
+self.addEventListener("message", (e) => {
+  if (e.data === "skip-waiting") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {

@@ -233,8 +233,6 @@
   .tl-bar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;}
   .tl-bar-fill{height:100%;border-radius:4px;}
   .tl-total{text-align:center;font-size:13px;color:var(--sub);margin-top:2px;}
-</style>
-</head>
   .cal-mask{
     position:fixed;inset:0;background:rgba(32,35,46,.28);backdrop-filter:blur(2px);
     display:flex;align-items:flex-end;justify-content:center;z-index:50;
@@ -1341,7 +1339,28 @@ document.getElementById("backupBtn").onclick=()=>{
 (function setupPWA(){
   // 用 http(s) 打开时注册 Service Worker，支持离线；file:// 直接打开则跳过
   if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-    navigator.serviceWorker.register("sw.js").catch(()=>{});
+    navigator.serviceWorker.register("sw.js").then((reg)=>{
+      // 发现新版本 SW 就绪后，等它接管再自动刷新一次，用户无需手动清缓存
+      reg.addEventListener("updatefound", ()=>{
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener("statechange", ()=>{
+          // 新 SW 装好且已有旧 SW 在控制页面 → 说明是"更新"，让它立即接管
+          if(nw.state === "installed" && navigator.serviceWorker.controller){
+            nw.postMessage("skip-waiting");
+          }
+        });
+      });
+      // 每次打开检查一次更新
+      reg.update();
+    }).catch(()=>{});
+    // 新 SW 接管后自动刷新一次（只刷一次，避免死循环）
+    let refreshed = false;
+    navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+      if(refreshed) return;
+      refreshed = true;
+      location.reload();
+    });
   }
 })();
 </script>
