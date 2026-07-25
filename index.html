@@ -248,16 +248,39 @@
   }
   .tl-block b{font-weight:600;}
   .tl-block .bt{opacity:.85;font-size:11px;}
+  .tl-sec-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px;}
+  .tl-sec-head h3{font-size:15px;font-weight:700;margin:0;color:var(--ink);}
+  .tl-chart-toggle{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:3px;}
+  .tl-chart-toggle .seg{
+    width:34px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:var(--sub);cursor:pointer;transition:.15s;user-select:none;
+  }
+  .tl-chart-toggle .seg svg{width:17px;height:17px;display:block;}
+  .tl-chart-toggle .seg.on{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(31,39,51,.1);}
   .tl-stats{margin-top:6px;}
-  .tl-stats h3{font-size:14px;font-weight:700;margin:0 0 10px;color:var(--ink);}
-  .tl-stat-row{display:flex;align-items:center;gap:9px;margin-bottom:12px;}
+  /* 饼（环形）图 */
+  .tl-pie-wrap{display:flex;align-items:center;gap:18px;margin-bottom:16px;}
+  .tl-pie{flex:0 0 auto;position:relative;width:132px;height:132px;}
+  .tl-pie svg{transform:rotate(-90deg);display:block;}
+  .tl-pie-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .tl-pie-center .big{font-size:17px;font-weight:700;color:var(--ink);line-height:1.1;}
+  .tl-pie-center .sm{font-size:11px;color:var(--sub);margin-top:2px;}
+  .tl-pie-legend{flex:1 1 auto;min-width:0;}
+  .tl-pie-legend .lg{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);margin-bottom:8px;}
+  .tl-pie-legend .lg:last-child{margin-bottom:0;}
+  .tl-pie-legend .lg .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tl-pie-legend .lg .vl{flex:0 0 auto;color:var(--sub);font-size:12px;}
+  /* 条形图 */
+  .tl-barchart{margin-bottom:14px;}
+  .tl-stat-row{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
   .tl-dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;}
   .tl-stat-body{flex:1 1 auto;min-width:0;}
-  .tl-stat-top{display:flex;justify-content:space-between;font-size:13px;color:var(--ink);margin-bottom:4px;}
+  .tl-stat-top{display:flex;justify-content:space-between;font-size:13px;color:var(--ink);margin-bottom:5px;}
+  .tl-stat-top .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .tl-stat-top .mins{color:var(--sub);font-size:12px;flex:0 0 auto;margin-left:8px;}
-  .tl-bar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;}
-  .tl-bar-fill{height:100%;border-radius:4px;}
-  .tl-total{text-align:center;font-size:13px;color:var(--sub);margin-top:2px;}
+  .tl-bar{height:9px;border-radius:5px;background:var(--line);overflow:hidden;}
+  .tl-bar-fill{height:100%;border-radius:5px;transition:width .3s;}
+  .tl-total{text-align:center;font-size:13px;color:var(--sub);margin:2px 0 24px;}
   .cal-mask{
     position:fixed;inset:0;background:rgba(32,35,46,.28);backdrop-filter:blur(2px);
     display:flex;align-items:flex-end;justify-content:center;z-index:50;
@@ -371,8 +394,8 @@
     <div class="parent-hint" id="parentHint"></div>
     <div class="input-row">
       <input id="taskInput" class="main-input" type="text" placeholder="添加任务，回车提交…" autocomplete="off" />
-      <button class="icon-btn" id="parentBtn" title="挂到上级目标">🎯</button>
-      <button class="icon-btn" id="timeBtn" title="设置时间">🕐</button>
+      <button class="icon-btn" id="parentBtn" title="挂到上级目标"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v7a4 4 0 0 0 4 4h8"/><path d="M14 11l4 4-4 4"/></svg></button>
+      <button class="icon-btn" id="timeBtn" title="设置时间"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></button>
       <button class="submit" id="submitBtn">＋</button>
     </div>
   </div>
@@ -432,6 +455,7 @@ let current = 0;       // 日程内当前清单索引
 let useTime = false;   // 是否展开时间选择
 let currentDate = todayStr();   // 日程当前查看的日期
 let dayMode = "list";  // 日程视图：list 清单 | timeline 时间轴
+let chartMode = "pie"; // 专注分布图：pie 扇形 | bar 条形
 let pendingParentId = null;   // 新任务待挂靠的上级目标 id
 
 /* ---------- 日期工具 ---------- */
@@ -862,13 +886,49 @@ function daySessions(dateStr_){
 }
 function renderTimeline(){
   const sessions=daySessions(currentDate);
-  const wrap=document.createElement("div");
-  wrap.className="timeline-wrap";
   if(!sessions.length){
     singleEl.innerHTML='<div class="tl-empty"><span class="big">🍅</span>今天还没有专注记录<br>点任务上的「▶ 专注」开始第一段番茄钟</div>';
     return;
   }
-  // 自动适配范围：最早开始 → 最晚结束，上下各留 ~30 分钟，整点对齐
+  const wrap=document.createElement("div");
+  wrap.className="timeline-wrap";
+
+  // —— 专注分布：默认扇形图，可切条形图（放在最前面）——
+  const byTask={};
+  sessions.forEach(s=>{ (byTask[s.task.id] ||= {task:s.task, sec:0}).sec+=s.focusSec||0; });
+  const rows=Object.values(byTask).sort((a,b)=>b.sec-a.sec);
+  const totalSec=rows.reduce((s,r)=>s+r.sec,0);
+
+  const stats=document.createElement("div");
+  stats.className="tl-stats";
+  const head=document.createElement("div");
+  head.className="tl-sec-head";
+  head.innerHTML=`<h3>专注分布</h3>
+    <div class="tl-chart-toggle">
+      <div class="seg${chartMode==='pie'?' on':''}" data-chart="pie" title="扇形图">${ICON_PIE}</div>
+      <div class="seg${chartMode==='bar'?' on':''}" data-chart="bar" title="条形图">${ICON_BAR}</div>
+    </div>`;
+  stats.appendChild(head);
+  const chartBox=document.createElement("div");
+  chartBox.className="tl-chart-box";
+  stats.appendChild(chartBox);
+  renderChart(chartBox, rows, totalSec);
+  head.querySelectorAll(".seg").forEach(seg=>{
+    seg.onclick=()=>{
+      chartMode=seg.dataset.chart;
+      head.querySelectorAll(".seg").forEach(s=>s.classList.toggle("on", s.dataset.chart===chartMode));
+      renderChart(chartBox, rows, totalSec);
+    };
+  });
+  wrap.appendChild(stats);
+
+  // —— 时间轴：自动适配范围（最早开始 → 最晚结束）——
+  const tlHead=document.createElement("div");
+  tlHead.className="tl-sec-head";
+  tlHead.style.marginTop="4px";
+  tlHead.innerHTML="<h3>时间轴</h3>";
+  wrap.appendChild(tlHead);
+
   const minS=Math.min(...sessions.map(s=>s.start));
   const maxE=Math.max(...sessions.map(s=>s.end));
   const startH=Math.max(0, new Date(minS).getHours() - (new Date(minS).getMinutes()<30?1:0));
@@ -882,7 +942,6 @@ function renderTimeline(){
 
   const grid=document.createElement("div");
   grid.className="tl-grid"; grid.style.height=gridH+"px";
-  // 整点刻度线
   for(let h=startH;h<=endH;h++){
     const row=document.createElement("div");
     row.className="tl-hour";
@@ -890,7 +949,6 @@ function renderTimeline(){
     row.innerHTML=`<span class="hh">${String(h).padStart(2,"0")}:00</span><span class="ln"></span>`;
     grid.appendChild(row);
   }
-  // session 色块
   const blocks=document.createElement("div");
   blocks.className="tl-blocks"; blocks.style.height=gridH+"px";
   sessions.forEach(s=>{
@@ -903,44 +961,74 @@ function renderTimeline(){
     b.style.background=colorOf(s.task.id);
     const t1=new Date(s.start), t2=new Date(s.end);
     const hm=d=>`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-    b.innerHTML=`<b>${s.task.text}</b> <span class="bt">${hm(t1)}–${hm(t2)}</span>`;
+    b.innerHTML=`<b>${escapeHtml(s.task.text)}</b> <span class="bt">${hm(t1)}–${hm(t2)}</span>`;
     blocks.appendChild(b);
   });
   grid.appendChild(blocks);
   wrap.appendChild(grid);
 
-  // 底部专注统计：按任务合计
-  const byTask={};
-  sessions.forEach(s=>{ (byTask[s.task.id] ||= {task:s.task, sec:0}).sec+=s.focusSec||0; });
-  const rows=Object.values(byTask).sort((a,b)=>b.sec-a.sec);
-  const totalSec=rows.reduce((s,r)=>s+r.sec,0);
-  const stats=document.createElement("div");
-  stats.className="tl-stats";
-  stats.innerHTML="<h3>专注分布</h3>";
-  rows.forEach(r=>{
-    const pct=totalSec? Math.round(r.sec/totalSec*100):0;
-    const col=colorOf(r.task.id);
-    const row=document.createElement("div");
-    row.className="tl-stat-row";
-    row.innerHTML=`<div class="tl-dot" style="background:${col}"></div>
-      <div class="tl-stat-body">
-        <div class="tl-stat-top"><span>${r.task.text}</span><span class="mins">${fmtDur(r.sec)} · ${pct}%</span></div>
-        <div class="tl-bar"><div class="tl-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-      </div>`;
-    stats.appendChild(row);
-  });
-  const tot=document.createElement("div");
-  tot.className="tl-total"; tot.textContent="共 "+fmtDur(totalSec)+" · "+rows.length+" 个任务";
-  stats.appendChild(tot);
-  wrap.appendChild(stats);
-
   singleEl.innerHTML="";
   singleEl.appendChild(wrap);
+}
+
+// 专注分布图：扇形（环形）或条形，二选一渲染到容器
+function renderChart(box, rows, totalSec){
+  box.innerHTML="";
+  if(chartMode==="pie"){
+    const R=60, C=2*Math.PI*R, size=132;
+    let off=0;
+    let segs="";
+    rows.forEach(r=>{
+      const frac=totalSec? r.sec/totalSec : 0;
+      const len=frac*C;
+      segs+=`<circle cx="${size/2}" cy="${size/2}" r="${R}" fill="none"
+        stroke="${colorOf(r.task.id)}" stroke-width="18"
+        stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}"/>`;
+      off+=len;
+    });
+    const legend=rows.map(r=>{
+      const pct=totalSec? Math.round(r.sec/totalSec*100):0;
+      return `<div class="lg"><span class="tl-dot" style="background:${colorOf(r.task.id)}"></span>
+        <span class="nm">${escapeHtml(r.task.text)}</span>
+        <span class="vl">${pct}% · ${fmtDur(r.sec)}</span></div>`;
+    }).join("");
+    box.innerHTML=`<div class="tl-pie-wrap">
+      <div class="tl-pie">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+          <circle cx="${size/2}" cy="${size/2}" r="${R}" fill="none" stroke="var(--line)" stroke-width="18"/>
+          ${segs}
+        </svg>
+        <div class="tl-pie-center"><span class="big">${fmtDur(totalSec)}</span><span class="sm">共 ${rows.length} 个任务</span></div>
+      </div>
+      <div class="tl-pie-legend">${legend}</div>
+    </div>`;
+  }else{
+    const bc=document.createElement("div");
+    bc.className="tl-barchart";
+    rows.forEach(r=>{
+      const pct=totalSec? Math.round(r.sec/totalSec*100):0;
+      const col=colorOf(r.task.id);
+      const row=document.createElement("div");
+      row.className="tl-stat-row";
+      row.innerHTML=`<div class="tl-dot" style="background:${col}"></div>
+        <div class="tl-stat-body">
+          <div class="tl-stat-top"><span class="nm">${escapeHtml(r.task.text)}</span><span class="mins">${fmtDur(r.sec)} · ${pct}%</span></div>
+          <div class="tl-bar"><div class="tl-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        </div>`;
+      bc.appendChild(row);
+    });
+    box.appendChild(bc);
+    const tot=document.createElement("div");
+    tot.className="tl-total"; tot.textContent="共 "+fmtDur(totalSec)+" · "+rows.length+" 个任务";
+    box.appendChild(tot);
+  }
 }
 
 /* ---------- 清单 / 时间轴 模式切换 ---------- */
 const ICON_LIST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
 const ICON_TL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><circle cx="5" cy="8" r="2"/><circle cx="5" cy="16" r="2"/><path d="M9 8h11M9 16h7"/></svg>';
+const ICON_PIE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9V3z"/><path d="M12 3v9h9"/></svg>';
+const ICON_BAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg>';
 function syncModeToggle(){
   if(view!=="day"){ modeToggleEl.style.display="none"; return; }
   modeToggleEl.style.display="flex";
@@ -1038,8 +1126,8 @@ function addTask(){
   const task={ id:uid(), text, done:false, createdAt:Date.now(),
     due:(useTime&&timeInput.value)? timeInput.value : null, parentText:null, children:[], sessions:[] };
   if(view==="day") task.date=currentDate;   // 日程任务归属到当前查看的日期
-  // 挂靠上级：把这条任务挂到某个更高层目标下，进度自动上卷
-  if(view==="day" && pendingParentId){
+  // 挂靠上级：把这条任务挂到某个更高层目标下，进度自动上卷（日/周/月均可）
+  if(pendingParentId){
     const parent=taskById(pendingParentId);
     if(parent){
       task.parentText=parent.text;
@@ -1078,10 +1166,17 @@ timeBtn.onclick=()=>{
 clearTime.onclick=()=>{ timeInput.value=""; useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); };
 
 /* ---------- 挂靠上级：选一个更高层目标 ---------- */
-// 挂靠上级：底部弹层，按 年/月/周 分组竖排，点一项即选中
+// 各视图可挂靠的上级层级（严格高于当前层：日<周<月<年）
+const PARENT_GROUPS={
+  day:[["year","年度目标"],["month","月计划"],["week","周计划"]],
+  week:[["year","年度目标"],["month","月计划"]],
+  month:[["year","年度目标"]],
+  year:[]
+};
+// 挂靠上级：底部弹层，按层级分组竖排，点一项即选中
 function renderParentSheet(){
   parentBodyEl.innerHTML="";
-  const groups=[["year","年度目标"],["month","月计划"],["week","周计划"]];
+  const groups=PARENT_GROUPS[view]||[];
   let any=false;
   groups.forEach(([v,label])=>{
     const tasks=state[v].tasks;
@@ -1100,7 +1195,8 @@ function renderParentSheet(){
     });
   });
   if(!any){
-    parentBodyEl.innerHTML='<div class="ph-empty">还没有上级目标<br>先去「周/月/年」写下目标，<br>就能把今天的任务挂上去了</div>';
+    const tip={day:"先去「周/月/年」写下目标",week:"先去「月/年」写下目标",month:"先去「年度目标」写下目标"}[view]||"先写下更高层的目标";
+    parentBodyEl.innerHTML=`<div class="ph-empty">还没有上级目标<br>${tip}，<br>就能把它挂上去了</div>`;
   }
 }
 function openParentSheet(){ renderParentSheet(); parentMaskEl.classList.add("show"); }
@@ -1109,7 +1205,7 @@ function closeParentSheet(){ parentMaskEl.classList.remove("show"); syncParentHi
 function syncParentHint(){
   const p = pendingParentId? taskById(pendingParentId) : null;
   if(p){
-    parentHintEl.innerHTML=`🎯 挂到「${escapeHtml(p.text)}」<span class="ph-x" id="phX">✕</span>`;
+    parentHintEl.innerHTML=`<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;"><path d="M6 4v7a4 4 0 0 0 4 4h8"/><path d="M14 11l4 4-4 4"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">挂到「${escapeHtml(p.text)}」</span><span class="ph-x" id="phX">✕</span>`;
     parentHintEl.classList.add("show");
     parentBtn.classList.add("on");
     document.getElementById("phX").onclick=()=>{ pendingParentId=null; syncParentHint(); };
@@ -1163,9 +1259,9 @@ function switchView(v){
   view=v;
   [...navEl.children].forEach(it=>it.classList.toggle("active",it.dataset.view===v));
   inputEl.placeholder=VIEW_PLACEHOLDER[v];
-  // 离开日程时收起"挂靠上级"选择器；只有日程才显示该按钮
-  parentBtn.style.display = v==="day" ? "flex" : "none";
-  if(v!=="day"){ pendingParentId=null; }
+  // 挂靠上级按钮：日/周/月都可挂到更高层，年度目标已是顶层则隐藏
+  parentBtn.style.display = (PARENT_GROUPS[v]&&PARENT_GROUPS[v].length) ? "flex" : "none";
+  pendingParentId=null;   // 切层后原上级可能已不合法，重置
   syncParentHint();
   rerender();
 }
