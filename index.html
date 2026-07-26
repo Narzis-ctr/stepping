@@ -1167,7 +1167,7 @@ function renderTimeline(){
 function renderChart(box, rows, totalSec){
   box.innerHTML="";
   if(chartMode==="pie"){
-    const R=60, C=2*Math.PI*R, size=132;
+    const R=54, C=2*Math.PI*R, size=132;   // R + 半个描边(9) + 余量 ≤ size/2(66)，避免圆被视口切边
     let off=0;
     let segs="";
     rows.forEach(r=>{
