@@ -96,9 +96,12 @@
   .task.done .check{background:var(--accent);border-color:var(--accent);}
   .task.done .check svg{opacity:1;}
   .task-body{flex:1 1 auto;min-width:0;}
-  .task-head{display:flex;align-items:baseline;gap:8px;}
+  .task-head{display:flex;align-items:center;gap:8px;}
   .task-head .task-text{flex:1 1 auto;min-width:0;}
-  .task-head .chip.time{flex:0 0 auto;align-self:center;}
+  .task-head .chip.time,.task-head .chip.addtime{flex:0 0 auto;}
+  .task-chev{flex:0 0 auto;width:16px;text-align:center;color:var(--sub);cursor:pointer;
+    font-size:10px;transition:transform .2s;user-select:none;}
+  .task-chev.open{transform:rotate(90deg);}
   .task-text{font-size:15px;line-height:1.3;word-break:break-word;transition:.15s;font-weight:500;}
   .task.done .task-text{color:var(--done);text-decoration:line-through;font-weight:400;}
   /* 节点：折叠箭头 + 进度 */
@@ -109,16 +112,18 @@
   .check.ring{border:none;position:relative;}
   .check.ring::before{content:"";position:absolute;inset:3px;background:var(--card);border-radius:50%;}
   .check.ring svg{position:relative;z-index:1;}
-  .prog{height:5px;border-radius:3px;background:#eef0f2;overflow:hidden;margin-top:6px;}
+  .prog-mini{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .prog-mini .prog{flex:1 1 auto;height:5px;border-radius:3px;background:#eef0f2;overflow:hidden;margin-top:0;}
   .prog-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .35s ease;}
-  .prog-label{font-size:11px;color:var(--sub);margin-top:4px;}
-  .prog-label b{color:var(--accent);font-weight:700;}
-  .prog-label .alldone{color:#34c759;}
+  .prog-pct{flex:0 0 auto;font-size:11px;color:var(--sub);}
+  .prog-pct.alldone{color:#34c759;}
   .children{margin:4px 0 2px 22px;padding-left:11px;border-left:2px solid var(--line);}
   .children .task{margin-top:6px;}
   .task-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center;}
   .chip{font-size:11px;padding:2px 8px;border-radius:9px;background:#f2f2f4;color:var(--sub);display:inline-flex;align-items:center;gap:3px;line-height:1.5;}
   .chip.time{background:var(--accent-soft);color:var(--accent);font-weight:600;}
+  .chip.addtime{background:transparent;color:var(--sub);border:1px dashed var(--line);font-weight:500;cursor:pointer;}
+  .chip.addtime:active{background:var(--accent-soft);color:var(--accent);}
   .chip.parent{background:transparent;color:var(--sub);padding-left:2px;}
   .chip.break{background:transparent;border:1px dashed var(--line);color:var(--sub);cursor:pointer;font-weight:500;}
   .chip.break:active{background:var(--accent-soft);}
@@ -136,10 +141,11 @@
   }
   .picker-row{display:none;margin-bottom:8px;}
   .picker-row.show{display:flex;gap:8px;align-items:center;}
-  .picker-row input{
+  .picker-row .time-field{
     flex:1 1 auto;border:none;background:var(--card);border-radius:16px;padding:10px 14px;
-    font-size:15px;box-shadow:var(--shadow);color:var(--ink);font-family:inherit;
+    font-size:15px;box-shadow:var(--shadow);color:var(--ink);cursor:pointer;user-select:none;
   }
+  .picker-row .time-field.empty{color:var(--sub);}
   .picker-row .clear-time{font-size:13px;color:var(--danger);padding:6px 10px;cursor:pointer;}
   /* 已选上级目标的提示条（输入框上方，一行文字，可点✕取消） */
   .parent-hint{display:none;align-items:center;gap:6px;margin-bottom:8px;font-size:13px;
@@ -352,6 +358,10 @@
   .mv-edit-field label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px;}
   .mv-edit-field input{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;
     padding:11px 13px;font-size:15px;color:var(--ink);font-family:inherit;}
+  .date-field{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;
+    padding:11px 13px;font-size:15px;color:var(--ink);cursor:pointer;user-select:none;box-sizing:border-box;}
+  .date-field.empty{color:var(--sub);}
+  .date-field:active{background:var(--accent-soft);}
   .mv-edit-hint{font-size:12px;color:var(--sub);line-height:1.6;margin:2px 2px 12px;}
   .mv-edit-reset{text-align:center;font-size:13px;color:var(--danger);padding:8px;cursor:pointer;margin-top:4px;}
   .cal-mask{
@@ -395,6 +405,22 @@
     font-size:14px;font-weight:600;color:var(--accent);background:var(--accent-soft);
     padding:9px 22px;border-radius:14px;cursor:pointer;user-select:none;
   }
+  /* 应用内日期时间选择器 */
+  .cal-month-label{text-align:center;font-size:15px;font-weight:600;color:var(--ink);margin:-4px 0 10px;}
+  .dt-time{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;}
+  .dt-time-label{font-size:13px;color:var(--sub);margin-bottom:8px;}
+  .dt-time-rows{display:flex;align-items:center;gap:8px;justify-content:center;}
+  .dt-colon{font-size:20px;font-weight:700;color:var(--ink);}
+  .dt-scroll{display:flex;gap:6px;overflow-x:auto;padding:2px;scrollbar-width:none;max-width:44%;}
+  .dt-scroll::-webkit-scrollbar{display:none;}
+  .dt-cell{flex:0 0 auto;min-width:44px;text-align:center;padding:8px 0;border-radius:12px;
+    background:var(--bg);color:var(--ink);font-size:15px;cursor:pointer;user-select:none;transition:.12s;}
+  .dt-cell.sel{background:var(--accent);color:#fff;font-weight:700;}
+  .dt-foot{display:flex;gap:10px;margin-top:16px;}
+  .dt-clear{flex:0 0 auto;font-size:14px;color:var(--danger);background:var(--bg);
+    padding:11px 20px;border-radius:14px;cursor:pointer;user-select:none;}
+  .dt-ok{flex:1 1 auto;text-align:center;font-size:15px;font-weight:600;color:#fff;background:var(--accent);
+    padding:11px 0;border-radius:14px;cursor:pointer;user-select:none;}
 </style>
 </head>
 <body>
@@ -415,7 +441,6 @@
       <div class="nav-arrow" id="datePrev">‹</div>
       <div class="date-label" id="dateLabel">今天</div>
       <div class="nav-arrow" id="dateNext">›</div>
-      <input type="date" id="datePicker" class="hidden-date" />
     </div>
   </header>
 
@@ -461,7 +486,7 @@
 
   <div class="composer">
     <div class="picker-row" id="pickerRow">
-      <input id="timeInput" type="datetime-local" />
+      <span class="time-field" id="timeField" data-val="">选择时间</span>
       <span class="clear-time" id="clearTime">清除</span>
     </div>
     <div class="parent-hint" id="parentHint"></div>
@@ -495,11 +520,11 @@
       <div class="mv-edit-hint" id="mvEditHint"></div>
       <div class="mv-edit-field">
         <label>开始日期</label>
-        <input type="date" id="mvStart" />
+        <div class="date-field" id="mvStart" data-val="">选择日期</div>
       </div>
       <div class="mv-edit-field">
         <label>结束 / 完成日期</label>
-        <input type="date" id="mvEnd" />
+        <div class="date-field" id="mvEnd" data-val="">选择日期</div>
       </div>
       <div class="cal-foot"><div class="cal-today-btn" id="mvEditSave">保存</div></div>
       <div class="mv-edit-reset" id="mvEditReset">清除手动校准，恢复自动</div>
@@ -515,6 +540,35 @@
       <div class="dialog-btns" id="dialogBtns"></div>
     </div>
   </div>
+
+  <!-- 应用内日期/时间选择器：替代浏览器原生 type=date / datetime-local -->
+  <div class="cal-mask" id="dtMask">
+    <div class="cal-sheet">
+      <div class="cal-head">
+        <div class="cal-title" id="dtTitle">选择时间</div>
+        <div class="cal-nav">
+          <div class="arrow" id="dtPrev">‹</div>
+          <div class="arrow" id="dtNext">›</div>
+        </div>
+      </div>
+      <div class="cal-month-label" id="dtMonthLabel"></div>
+      <div class="cal-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="cal-grid" id="dtGrid"></div>
+      <div class="dt-time" id="dtTimeSection">
+        <div class="dt-time-label">时间</div>
+        <div class="dt-time-rows">
+          <div class="dt-scroll" id="dtHours"></div>
+          <div class="dt-colon">:</div>
+          <div class="dt-scroll" id="dtMins"></div>
+        </div>
+      </div>
+      <div class="dt-foot">
+        <div class="dt-clear" id="dtClear">清除</div>
+        <div class="dt-ok" id="dtOk">确定</div>
+      </div>
+    </div>
+  </div>
+
 
   <nav class="nav" id="nav">
     <div class="nav-item active" data-view="day">
@@ -781,14 +835,13 @@ const inputEl=document.getElementById("taskInput");
 const submitEl=document.getElementById("submitBtn");
 const timeBtn=document.getElementById("timeBtn");
 const pickerRow=document.getElementById("pickerRow");
-const timeInput=document.getElementById("timeInput");
+const timeField=document.getElementById("timeField");
 const clearTime=document.getElementById("clearTime");
 const navEl=document.getElementById("nav");
 const datebarEl=document.getElementById("datebar");
 const dateLabelEl=document.getElementById("dateLabel");
 const datePrevEl=document.getElementById("datePrev");
 const dateNextEl=document.getElementById("dateNext");
-const datePickerEl=document.getElementById("datePicker");
 const calMaskEl=document.getElementById("calMask");
 const calSheetEl=document.getElementById("calSheet");
 const calTitleEl=document.getElementById("calTitle");
@@ -898,14 +951,7 @@ function renderTask(task, listRef, ownerView){
   const hasKids=kids.length>0;
   const prog=progressOf(task);
 
-  // 折叠箭头
-  const caret=document.createElement("div");
-  caret.className="caret"+(hasKids?"":" leaf")+(expanded[task.id]?" open":"");
-  caret.textContent="▶";
-  if(hasKids) caret.onclick=(e)=>{ e.stopPropagation(); expanded[task.id]=!expanded[task.id]; rerender(); };
-  el.appendChild(caret);
-
-  // 勾选圈：有子节点时按进度显示、不可直接勾（由子节点决定）
+  // 勾选圈：永远在卡片最前，位置统一。有子节点时按进度显示环、点击=展开/收起（不可直接勾）
   const check=document.createElement("div");
   const pctRatio = prog.total? prog.done/prog.total : 0;
   const full = hasKids && pctRatio>=1;
@@ -922,30 +968,43 @@ function renderTask(task, listRef, ownerView){
 
   const body=document.createElement("div");
   body.className="task-body";
-  // 标题行：标题 + 时间 chip 同行（时间靠右，标题占满剩余）
+  // 标题行：标题 + 时间 chip + 展开箭头（仅有子节点时，放在最右）
   const head=document.createElement("div");
   head.className="task-head";
   const txt=document.createElement("div");
   txt.className="task-text"; txt.textContent=task.text;
   head.appendChild(txt);
+  // 时间：有则显示可点编辑；无且是日程叶子则显示"＋时间"入口
+  const timeChip=document.createElement("span");
   if(task.due){
-    const c=document.createElement("span");
-    c.className="chip time"; c.textContent="🕐 "+fmtDue(task.due);
-    head.appendChild(c);
+    timeChip.className="chip time"; timeChip.textContent="🕐 "+fmtDue(task.due);
+    timeChip.onclick=(e)=>{ e.stopPropagation(); editTaskDue(task); };
+    head.appendChild(timeChip);
+  }else if(!hasKids){
+    timeChip.className="chip addtime"; timeChip.textContent="＋时间";
+    timeChip.onclick=(e)=>{ e.stopPropagation(); editTaskDue(task); };
+    head.appendChild(timeChip);
+  }
+  if(hasKids){
+    const chev=document.createElement("div");
+    chev.className="task-chev"+(expanded[task.id]?" open":"");
+    chev.textContent="▶";
+    chev.onclick=(e)=>{ e.stopPropagation(); expanded[task.id]=!expanded[task.id]; rerender(); };
+    head.appendChild(chev);
   }
   body.appendChild(head);
 
-  // 父节点：进度条 + 文字
+  // 父节点：极简进度（细条 + 百分比），圆圈已表进度，此处只做补充
   if(hasKids){
     const pct = prog.total? Math.round(prog.done/prog.total*100) : 0;
+    const mini=document.createElement("div"); mini.className="prog-mini";
     const bar=document.createElement("div"); bar.className="prog";
     const fill=document.createElement("div"); fill.className="prog-fill"; fill.style.width=pct+"%";
-    bar.appendChild(fill); body.appendChild(bar);
-    const lab=document.createElement("div"); lab.className="prog-label";
-    lab.innerHTML = pct>=100
-      ? `<span class="alldone">✓ 已全部完成</span> · ${prog.done}/${prog.total}`
-      : `已推进 <b>${pct}%</b> · ${prog.done}/${prog.total} 项完成`;
-    body.appendChild(lab);
+    bar.appendChild(fill); mini.appendChild(bar);
+    const pctEl=document.createElement("span"); pctEl.className="prog-pct"+(pct>=100?" alldone":"");
+    pctEl.textContent = pct>=100 ? `✓ ${prog.done}/${prog.total}` : `${prog.done}/${prog.total}`;
+    mini.appendChild(pctEl);
+    body.appendChild(mini);
   }
 
   // 次要标签行：挂靠 / 拆解 / 专注（比标题小、灰）
@@ -1335,16 +1394,28 @@ function openMvEdit(task){
   mvEditTitleEl.textContent="校准时间";
   mvEditHintEl.innerHTML=`「${escapeHtml(task.text)}」<br>默认按名下日任务自动推算；如需手动指定这件事的起止，填写下方日期。`;
   const ms=task.manualSpan||{};
-  mvStartEl.value=ms.start||"";
-  mvEndEl.value=ms.end||"";
+  setDateField(mvStartEl, ms.start||"");
+  setDateField(mvEndEl, ms.end||"");
   mvEditMaskEl.classList.add("show");
 }
+// 日期字段显示 + 存值（data-val 存 YYYY-MM-DD，空则显示占位）
+function setDateField(el, val){
+  el.dataset.val=val||"";
+  el.textContent = val ? fmtDateLabel(val) : "选择日期";
+  el.classList.toggle("empty", !val);
+}
+mvStartEl.onclick=()=>{
+  openDatePicker({ value:mvStartEl.dataset.val, title:"开始日期" }).then(r=>{ if(r!==undefined) setDateField(mvStartEl, r||""); });
+};
+mvEndEl.onclick=()=>{
+  openDatePicker({ value:mvEndEl.dataset.val, title:"结束 / 完成日期" }).then(r=>{ if(r!==undefined) setDateField(mvEndEl, r||""); });
+};
 function closeMvEdit(){ mvEditMaskEl.classList.remove("show"); mvEditingId=null; }
 mvEditCloseEl.onclick=closeMvEdit;
 mvEditMaskEl.onclick=(e)=>{ if(e.target===mvEditMaskEl) closeMvEdit(); };
 mvEditSaveEl.onclick=()=>{
   const t=taskById(mvEditingId); if(!t){ closeMvEdit(); return; }
-  const s=mvStartEl.value, e=mvEndEl.value;
+  const s=mvStartEl.dataset.val, e=mvEndEl.dataset.val;
   if(!s && !e){ t.manualSpan=null; }
   else{
     const start=s||e, end=e||s;
@@ -1480,7 +1551,7 @@ function addTask(){
   const text=inputEl.value.trim();
   if(!text) return;
   const task={ id:uid(), text, done:false, createdAt:Date.now(),
-    due:(useTime&&timeInput.value)? timeInput.value : null, parentText:null, children:[], sessions:[] };
+    due:(useTime&&timeField.dataset.val)? timeField.dataset.val : null, parentText:null, children:[], sessions:[] };
   if(view==="day") task.date=currentDate;   // 日程任务归属到当前查看的日期
   // 挂靠上级：把这条任务挂到某个更高层目标下，进度自动上卷（日/周/月均可）
   if(pendingParentId){
@@ -1494,7 +1565,7 @@ function addTask(){
   activeTasks().push(task);
   inputEl.value="";
   // 加完任务后收起时间/上级选择器，恢复干净的输入栏
-  useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); timeInput.value="";
+  useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); setComposerTime("");
   pendingParentId=null; syncParentHint();
   save(); rerender();
   if(view==="day" && dayMode==="list") requestAnimationFrame(()=>{ if(trackEl.children[current])trackEl.children[current].scrollTop=0; });
@@ -1510,18 +1581,33 @@ function addList(){
 }
 
 /* ---------- 时间选择开关 ---------- */
+// composer 时间字段显示 + 存值（data-val 存 YYYY-MM-DDTHH:mm）
+function setComposerTime(val){
+  timeField.dataset.val=val||"";
+  timeField.textContent = val ? fmtDue(val) : "选择时间";
+  timeField.classList.toggle("empty", !val);
+}
 timeBtn.onclick=()=>{
   useTime=!useTime;
   pickerRow.classList.toggle("show",useTime);
   timeBtn.classList.toggle("on",useTime);
-  if(useTime && !timeInput.value){
-    const d=new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1);
-    const pad=n=>String(n).padStart(2,"0");
-    timeInput.value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    timeInput.focus();
+  if(useTime){
+    if(!timeField.dataset.val){
+      const d=new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1);
+      setComposerTime(`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`);
+    }
+    openComposerTimePicker();
   }
 };
-clearTime.onclick=()=>{ timeInput.value=""; useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); };
+function openComposerTimePicker(){
+  openDatePicker({ value:timeField.dataset.val, withTime:true, title:"设置时间" }).then(r=>{
+    if(r===undefined) return;          // 取消：保留原值
+    if(r===null){ setComposerTime(""); useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); return; }
+    setComposerTime(r);
+  });
+}
+timeField.onclick=openComposerTimePicker;
+clearTime.onclick=()=>{ setComposerTime(""); useTime=false; pickerRow.classList.remove("show"); timeBtn.classList.remove("on"); };
 
 /* ---------- 挂靠上级：选一个更高层目标 ---------- */
 // 各视图可挂靠的上级层级（严格高于当前层：日<周<月<年）
@@ -1637,7 +1723,6 @@ datePrevEl.onclick=()=>goToDate(shiftDate(currentDate,-1));
 dateNextEl.onclick=()=>goToDate(shiftDate(currentDate,1));
 // 点日期文字：展开月历弹层，可翻月 + 点日期跳转
 dateLabelEl.onclick=()=>openCalendar();
-datePickerEl.onchange=()=>{ if(datePickerEl.value) goToDate(datePickerEl.value); };
 
 /* ---------- 月历弹层 ---------- */
 let calCursor = currentDate;   // 月历当前显示的月份（取该月任意一天）
@@ -1682,9 +1767,113 @@ calMaskEl.onclick=(e)=>{ if(e.target===calMaskEl) closeCalendar(); };
 
 /* ---------- 键盘（桌面预览） ---------- */
 window.addEventListener("keydown",e=>{
-  if(document.activeElement===inputEl||document.activeElement===timeInput) return;
+  if(document.activeElement===inputEl) return;
   if(view==="day"&&dayMode==="list"){ if(e.key==="ArrowRight")goTo(current+1); if(e.key==="ArrowLeft")goTo(current-1); }
 });
+
+/* ---------- 应用内日期时间选择器（替代原生 type=date / datetime-local） ---------- */
+// 用法：openDatePicker({value, withTime, title}).then(result => ...)
+// value: "YYYY-MM-DD" 或 "YYYY-MM-DDTHH:mm" 或 ""; 返回同格式字符串，或 null(清除)，或 undefined(取消)
+const dtMaskEl=document.getElementById("dtMask");
+const dtTitleEl=document.getElementById("dtTitle");
+const dtMonthLabelEl=document.getElementById("dtMonthLabel");
+const dtGridEl=document.getElementById("dtGrid");
+const dtHoursEl=document.getElementById("dtHours");
+const dtMinsEl=document.getElementById("dtMins");
+const dtTimeSectionEl=document.getElementById("dtTimeSection");
+const dtPrevEl=document.getElementById("dtPrev");
+const dtNextEl=document.getElementById("dtNext");
+const dtClearEl=document.getElementById("dtClear");
+const dtOkEl=document.getElementById("dtOk");
+let _dtResolve=null, _dtCursor="", _dtSel="", _dtHour=9, _dtMin=0, _dtWithTime=false;
+
+function openDatePicker(opts={}){
+  return new Promise(resolve=>{
+    _dtResolve=resolve;
+    _dtWithTime=!!opts.withTime;
+    dtTitleEl.textContent=opts.title||(_dtWithTime?"选择日期与时间":"选择日期");
+    dtTimeSectionEl.style.display=_dtWithTime?"block":"none";
+    const v=opts.value||"";
+    if(v){
+      _dtSel=v.slice(0,10);
+      if(_dtWithTime && v.length>=16){ _dtHour=Number(v.slice(11,13)); _dtMin=Number(v.slice(14,16)); }
+      else { _dtHour=9; _dtMin=0; }
+    }else{
+      _dtSel=todayStr();
+      const d=new Date(); _dtHour=(d.getHours()+1)%24; _dtMin=0;
+    }
+    _dtCursor=_dtSel;
+    renderDtGrid(); renderDtTime();
+    dtMaskEl.classList.add("show");
+  });
+}
+function closeDatePicker(val){
+  dtMaskEl.classList.remove("show");
+  const r=_dtResolve; _dtResolve=null;
+  if(r) r(val);
+}
+function renderDtGrid(){
+  const cur=new Date(_dtCursor+"T00:00:00");
+  const y=cur.getFullYear(), m=cur.getMonth();
+  dtMonthLabelEl.textContent=`${y}年${m+1}月`;
+  const startDow=new Date(y,m,1).getDay();
+  const dim=new Date(y,m+1,0).getDate();
+  const prevDays=new Date(y,m,0).getDate();
+  const today=todayStr();
+  dtGridEl.innerHTML="";
+  const cells=[];
+  for(let i=startDow-1;i>=0;i--) cells.push({d:prevDays-i, mm:m-1, yy:y, other:true});
+  for(let d=1;d<=dim;d++) cells.push({d, mm:m, yy:y, other:false});
+  while(cells.length%7!==0) cells.push({d:cells.length-startDow-dim+1, mm:m+1, yy:y, other:true});
+  cells.forEach(c=>{
+    const cd=new Date(c.yy, c.mm, c.d);
+    const str=dateStr(cd);
+    const cell=document.createElement("div");
+    cell.className="cal-cell"+(c.other?" other":"")+(str===today?" today":"")+(str===_dtSel?" sel":"");
+    cell.textContent=c.d;
+    cell.onclick=()=>{ _dtSel=str; renderDtGrid(); };
+    dtGridEl.appendChild(cell);
+  });
+}
+function renderDtTime(){
+  if(!_dtWithTime) return;
+  dtHoursEl.innerHTML=""; dtMinsEl.innerHTML="";
+  for(let h=0;h<24;h++){
+    const c=document.createElement("div");
+    c.className="dt-cell"+(h===_dtHour?" sel":""); c.textContent=pad2(h);
+    c.onclick=()=>{ _dtHour=h; renderDtTime(); };
+    dtHoursEl.appendChild(c);
+  }
+  for(let mm=0;mm<60;mm+=5){
+    const c=document.createElement("div");
+    c.className="dt-cell"+(mm===_dtMin?" sel":""); c.textContent=pad2(mm);
+    c.onclick=()=>{ _dtMin=mm; renderDtTime(); };
+    dtMinsEl.appendChild(c);
+  }
+  // 选中项滚动到可见
+  requestAnimationFrame(()=>{
+    const hs=dtHoursEl.querySelector(".sel"), ms=dtMinsEl.querySelector(".sel");
+    if(hs) dtHoursEl.scrollLeft=hs.offsetLeft-dtHoursEl.clientWidth/2+hs.clientWidth/2;
+    if(ms) dtMinsEl.scrollLeft=ms.offsetLeft-dtMinsEl.clientWidth/2+ms.clientWidth/2;
+  });
+}
+dtPrevEl.onclick=()=>{ const d=new Date(_dtCursor+"T00:00:00"); d.setMonth(d.getMonth()-1); _dtCursor=dateStr(d); renderDtGrid(); };
+dtNextEl.onclick=()=>{ const d=new Date(_dtCursor+"T00:00:00"); d.setMonth(d.getMonth()+1); _dtCursor=dateStr(d); renderDtGrid(); };
+dtClearEl.onclick=()=>closeDatePicker(null);
+dtOkEl.onclick=()=>{
+  if(!_dtSel){ closeDatePicker(null); return; }
+  closeDatePicker(_dtWithTime ? `${_dtSel}T${pad2(_dtHour)}:${pad2(_dtMin)}` : _dtSel);
+};
+dtMaskEl.onclick=(e)=>{ if(e.target===dtMaskEl) closeDatePicker(undefined); };
+
+// 编辑某个任务的截止时间（点卡片上的时间 chip 或"＋时间"触发）
+function editTaskDue(task){
+  openDatePicker({ value:task.due||"", withTime:true, title:"设置任务时间" }).then(res=>{
+    if(res===undefined) return;   // 取消
+    task.due = res;               // 具体时间 或 null(清除)
+    save(); rerender();
+  });
+}
 
 /* ---------- 番茄钟计时 ---------- */
 let timerState=null;   // { taskId, durationMin, startedAt, accumBeforePauseSec, paused } | null
