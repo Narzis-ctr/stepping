@@ -49,7 +49,7 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .title-row h1.long{font-size:21px;}
   .title-wrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 auto;}
-  .sub-row{display:flex;align-items:baseline;min-width:0;}
+  .sub-row{display:flex;align-items:center;min-width:0;gap:2px;}
   .sub-row .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sub-row .count{font-size:13px;color:var(--sub);flex:0 0 auto;}
@@ -58,24 +58,22 @@
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
-  /* 日期切换条（仅日程视图显示） */
-  .datebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px 12px;}
-  .datebar.hidden{display:none;}
-  .datebar .nav-arrow{
-    width:32px;height:32px;border-radius:50%;background:var(--card);border:1px solid var(--line);
-    display:flex;align-items:center;justify-content:center;color:var(--sub);cursor:pointer;
-    font-size:15px;flex:0 0 auto;transition:.15s;user-select:none;
+  /* 日期切换：内嵌在副标题行，紧凑无边框，读作标题的一部分 */
+  .datenav{display:flex;align-items:center;gap:3px;flex:0 0 auto;}
+  .datenav.hidden{display:none;}
+  .datenav .nav-arrow{
+    width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:var(--sub);cursor:pointer;font-size:16px;flex:0 0 auto;transition:.15s;user-select:none;
   }
-  .datebar .nav-arrow:active{background:var(--accent-soft);color:var(--accent);}
-  .datebar .date-label{
-    font-size:15px;font-weight:600;min-width:160px;text-align:center;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;gap:6px;
+  .datenav .nav-arrow:active{background:var(--accent-soft);color:var(--accent);}
+  .datenav .date-label{
+    font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;white-space:nowrap;
+    display:flex;align-items:center;gap:5px;padding:2px 4px;
   }
-  .datebar .date-label .today-badge{
-    font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);
-    padding:2px 7px;border-radius:8px;
-  }
-  .datebar input.hidden-date{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+  .datenav .date-label:active{color:var(--accent);}
+  /* 副标题行里紧跟日期的分隔与文案 */
+  .sub-row .subtitle.after-date{margin-left:8px;}
+  .sub-row .subtitle.after-date:not(:empty)::before{content:"·";margin-right:8px;color:var(--line);}
   .tab{
     flex:0 0 auto;padding:7px 15px;border-radius:20px;font-size:14px;font-weight:500;
     background:var(--card);color:var(--sub);border:1px solid var(--line);
@@ -107,6 +105,9 @@
   .task-head{display:flex;align-items:center;gap:8px;}
   .task-head .task-text{flex:1 1 auto;min-width:0;}
   .task-head .chip.time,.task-head .chip.addtime{flex:0 0 auto;}
+  /* 时间前缀：放在任务文字最前，24h 时刻，accent 色、等宽数字 */
+  .task-head .task-time{flex:0 0 auto;font-size:13.5px;font-weight:600;color:var(--accent);
+    font-variant-numeric:tabular-nums;letter-spacing:.2px;cursor:pointer;line-height:1.3;}
   .task-chev{flex:0 0 auto;width:16px;text-align:center;color:var(--sub);cursor:pointer;
     font-size:10px;transition:transform .2s;user-select:none;}
   .task-chev.open{transform:rotate(90deg);}
@@ -135,8 +136,9 @@
   .chip.parent{background:transparent;color:var(--sub);padding-left:2px;}
   .chip.break{background:transparent;border:1px dashed var(--line);color:var(--sub);cursor:pointer;font-weight:500;}
   .chip.break:active{background:var(--accent-soft);}
-  .chip.focus{background:transparent;border:1px solid var(--line);color:var(--sub);cursor:pointer;font-weight:500;}
-  .chip.focus:active{background:var(--accent-soft);}
+  .chip.focus{background:var(--accent-soft);border:none;color:var(--accent);cursor:pointer;font-weight:600;
+    font-size:12.5px;padding:5px 13px;border-radius:11px;gap:5px;}
+  .chip.focus:active{transform:scale(.96);}
   .chip.focused{background:var(--accent-soft);color:var(--accent);font-weight:600;}
   .del{flex:0 0 auto;color:var(--sub);font-size:19px;line-height:1;padding:2px 3px;cursor:pointer;opacity:.3;margin-top:1px;}
   .del:active{opacity:1;color:var(--danger);}
@@ -437,6 +439,11 @@
       <div class="title-wrap">
         <h1 id="listTitle">日程</h1>
         <div class="sub-row">
+          <div class="datenav hidden" id="datenav">
+            <div class="nav-arrow" id="datePrev">‹</div>
+            <div class="date-label" id="dateLabel">今天</div>
+            <div class="nav-arrow" id="dateNext">›</div>
+          </div>
           <span class="subtitle" id="subtitle"></span>
           <span class="count" id="countLabel"></span>
         </div>
@@ -445,11 +452,6 @@
         <span class="mode-toggle" id="modeToggle"></span>
         <span id="backupBtn" title="备份 / 恢复" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></span>
       </div>
-    </div>
-    <div class="datebar" id="datebar">
-      <div class="nav-arrow" id="datePrev">‹</div>
-      <div class="date-label" id="dateLabel">今天</div>
-      <div class="nav-arrow" id="dateNext">›</div>
     </div>
     <div class="tabs" id="tabs"></div>
   </header>
@@ -695,6 +697,17 @@ function fmtDateLabel(str){
   if(str===shiftDate(t,-1)) return `昨天 · ${md}`;
   return `${week} · ${md}`;
 }
+// 顶部日期切换的紧凑文字：今天 / 明天 / M月D日（周几），比 fmtDateLabel 更短
+function fmtDateNav(str){
+  const d=new Date(str+"T00:00:00");
+  const t=todayStr();
+  const md=`${d.getMonth()+1}月${d.getDate()}日`;
+  if(str===t) return "今天";
+  if(str===shiftDate(t,1)) return "明天";
+  if(str===shiftDate(t,-1)) return "昨天";
+  const week=["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];
+  return `${md} ${week}`;
+}
 
 function blank(){
   return {
@@ -848,7 +861,7 @@ const pickerRow=document.getElementById("pickerRow");
 const timeField=document.getElementById("timeField");
 const clearTime=document.getElementById("clearTime");
 const navEl=document.getElementById("nav");
-const datebarEl=document.getElementById("datebar");
+const datenavEl=document.getElementById("datenav");
 const dateLabelEl=document.getElementById("dateLabel");
 const datePrevEl=document.getElementById("datePrev");
 const dateNextEl=document.getElementById("dateNext");
@@ -893,9 +906,9 @@ function activeTasks(){
 
 /* ---------- 渲染顶部 ---------- */
 function renderTabs(){
-  if(view!=="day"){ tabsEl.classList.add("hidden"); datebarEl.classList.add("hidden"); return; }
-  datebarEl.classList.remove("hidden");
-  dateLabelEl.innerHTML=fmtDateLabel(currentDate)+' <span style="color:var(--sub);font-size:12px;">▾</span>';
+  if(view!=="day"){ tabsEl.classList.add("hidden"); datenavEl.classList.add("hidden"); return; }
+  datenavEl.classList.remove("hidden");
+  dateLabelEl.innerHTML=fmtDateNav(currentDate)+' <span style="color:var(--sub);font-size:11px;">▾</span>';
   // 时间轴模式下清单标签无意义（跨清单汇总），隐藏之
   if(dayMode==="timeline"){ tabsEl.classList.add("hidden"); return; }
   tabsEl.classList.remove("hidden");
@@ -983,14 +996,21 @@ function renderTask(task, listRef, ownerView){
   head.className="task-head";
   const txt=document.createElement("div");
   txt.className="task-text"; txt.textContent=task.text;
+  // 日程视图：时间作为前缀放在任务文字最前（24h 时刻，无 emoji、无"今天"）
+  if(ownerView==="day" && task.due){
+    const tp=document.createElement("span");
+    tp.className="task-time"; tp.textContent=fmtTimeOnly(task.due);
+    tp.onclick=(e)=>{ e.stopPropagation(); editTaskDue(task); };
+    head.appendChild(tp);
+  }
   head.appendChild(txt);
-  // 时间：有则显示可点编辑；无且是日程叶子则显示"＋时间"入口
+  // 时间 chip：非日程视图（周/月/年）仍在文字后显示完整日期时间；日程无时间的叶子给"＋时间"入口
   const timeChip=document.createElement("span");
-  if(task.due){
-    timeChip.className="chip time"; timeChip.textContent="🕐 "+fmtDue(task.due);
+  if(ownerView!=="day" && task.due){
+    timeChip.className="chip time"; timeChip.textContent=fmtDue(task.due);
     timeChip.onclick=(e)=>{ e.stopPropagation(); editTaskDue(task); };
     head.appendChild(timeChip);
-  }else if(!hasKids){
+  }else if(!task.due && !hasKids){
     timeChip.className="chip addtime"; timeChip.textContent="＋时间";
     timeChip.onclick=(e)=>{ e.stopPropagation(); editTaskDue(task); };
     head.appendChild(timeChip);
@@ -1033,22 +1053,16 @@ function renderTask(task, listRef, ownerView){
     b.onclick=(e)=>{ e.stopPropagation(); breakdown(task, ownerView); };
     tags.appendChild(b);
   }
-  // 专注：仅日程叶子任务、且看的是今天，才给"开始番茄钟"入口
-  if(ownerView==="day" && !hasKids){
+  // 专注：仅日程叶子任务、且看的是今天，才给"开始番茄钟"入口（放大、更醒目）
+  //      卡片上不再堆叠已专注时长（那是时间轴/统计的事），保持卡片清爽
+  if(ownerView==="day" && !hasKids && currentDate===todayStr()){
     const focusSec=(task.sessions||[]).reduce((s,x)=>s+(x.focusSec||0),0);
-    if(currentDate===todayStr()){
-      const f=document.createElement("span");
-      f.className="chip focus";
-      f.textContent="▶ 专注";
-      f.onclick=(e)=>{ e.stopPropagation(); openTimer(task); };
-      tags.appendChild(f);
-    }
-    if(focusSec>0){
-      const s=document.createElement("span");
-      s.className="chip focused";
-      s.textContent="🍅 "+fmtDur(focusSec);
-      tags.appendChild(s);
-    }
+    const f=document.createElement("span");
+    f.className="chip focus";
+    // 已专注过 → 按钮里带上时长，一处呈现：▶ 专注 · 25分钟
+    f.textContent = focusSec>0 ? `▶ 专注 · ${fmtDur(focusSec)}` : "▶ 专注";
+    f.onclick=(e)=>{ e.stopPropagation(); openTimer(task); };
+    tags.appendChild(f);
   }
   if(tags.children.length) body.appendChild(tags);
 
@@ -1534,22 +1548,24 @@ function rerender(){
 function updateHeader(){
   if(view==="day" && dayMode==="timeline"){
     titleEl.textContent="时间轴";
+    subtitleEl.className="subtitle";
     subtitleEl.textContent="今天的时间都花在哪了";
     const secs=daySessions(currentDate).reduce((s,x)=>s+(x.focusSec||0),0);
     countEl.textContent= secs>0? "共专注 "+fmtDur(secs) : "";
   }else if(view==="day"){
     const list=state.day.lists[current];
     titleEl.textContent=list.name;
+    // 日期已在标题行的 datenav 里显示，副标题只补充"做什么/铺垫"，避免与日期重复
     const isToday = currentDate===todayStr();
-    subtitleEl.textContent = isToday ? "今天做点什么"
-      : (currentDate===shiftDate(todayStr(),1) ? "明天做点什么"
-      : `安排「${fmtDateLabel(currentDate).split(" · ").pop()}」`);
+    subtitleEl.className="subtitle after-date";
+    subtitleEl.textContent = isToday ? "今天做点什么" : "这天的安排";
     const todays=dayTasksOf(list);
     const total=todays.length, done=todays.filter(t=>t.done).length;
     countEl.textContent= total? `${done}/${total} 已完成` : "";
   }else{
     const ov = ovMode[view]==="overview";
     titleEl.textContent=VIEW_TITLE[view];
+    subtitleEl.className="subtitle";
     if(ov){
       subtitleEl.textContent={week:"本周概览",month:"本月概览",year:"年度概览"}[view]||"";
     }else{
@@ -1581,6 +1597,11 @@ function fmtDue(iso){
   if(sameDay) return "今天 "+hm;
   if(isTmr) return "明天 "+hm;
   return `${d.getMonth()+1}月${d.getDate()}日 ${hm}`;
+}
+// 仅时刻（24h HH:mm），用于日程卡片把时间放在任务文字最前
+function fmtTimeOnly(iso){
+  const d=new Date(iso), pad=n=>String(n).padStart(2,"0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /* ---------- 视图层级 & 拆解 ---------- */
