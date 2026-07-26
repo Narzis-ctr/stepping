@@ -233,6 +233,33 @@
   .btn.danger{background:transparent;color:var(--sub);font-weight:500;font-size:14px;padding:6px;}
   .btn.danger:active{color:var(--danger);}
 
+  /* ---- 通用应用内弹窗（替代浏览器 prompt/confirm/alert）---- */
+  .dialog-mask{
+    position:fixed;inset:0;background:rgba(32,35,46,.32);backdrop-filter:blur(2px);
+    display:flex;align-items:center;justify-content:center;z-index:80;padding:24px;
+    opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .dialog-mask.show{opacity:1;pointer-events:auto;}
+  .dialog-card{
+    width:100%;max-width:340px;background:var(--card);border-radius:22px;
+    padding:22px 20px 18px;box-shadow:0 12px 40px rgba(40,45,80,.24);
+    transform:scale(.92);transition:transform .24s cubic-bezier(.22,.61,.36,1);
+  }
+  .dialog-mask.show .dialog-card{transform:scale(1);}
+  .dialog-title{font-size:17px;font-weight:700;color:var(--ink);text-align:center;line-height:1.4;}
+  .dialog-msg{font-size:14px;color:var(--sub);text-align:center;line-height:1.6;margin-top:8px;white-space:pre-line;}
+  .dialog-input{
+    width:100%;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;
+    font-size:16px;color:var(--ink);background:var(--bg);outline:none;box-sizing:border-box;transition:.15s;
+  }
+  .dialog-input:focus{border-color:var(--accent);background:var(--card);}
+  .dialog-btns{display:flex;flex-direction:column;gap:9px;margin-top:20px;}
+  .dialog-btns .btn{padding:13px;border-radius:15px;font-size:16px;font-weight:600;cursor:pointer;user-select:none;border:none;text-align:center;}
+  .dialog-btns .btn.ghost{background:var(--bg);color:var(--ink);}
+  .dialog-btns .btn.ghost:active{background:var(--accent-soft);}
+  .dialog-btns .btn.dngr{background:transparent;color:var(--danger);font-weight:600;}
+  .dialog-btns .btn.dngr:active{background:rgba(230,90,90,.08);}
+
   /* ---- 时间轴视图 ---- */
   .timeline-wrap{padding:8px 0 12px;}
   .tl-empty{text-align:center;color:var(--sub);font-size:14px;margin-top:70px;line-height:2;}
@@ -474,6 +501,16 @@
     </div>
   </div>
 
+  <!-- 通用应用内弹窗：替代浏览器原生 prompt / confirm / alert -->
+  <div class="dialog-mask" id="dialogMask">
+    <div class="dialog-card">
+      <div class="dialog-title" id="dialogTitle"></div>
+      <div class="dialog-msg" id="dialogMsg"></div>
+      <input class="dialog-input" id="dialogInput" style="display:none" />
+      <div class="dialog-btns" id="dialogBtns"></div>
+    </div>
+  </div>
+
   <nav class="nav" id="nav">
     <div class="nav-item active" data-view="day">
       <span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></span>
@@ -502,6 +539,57 @@ const VIEW_PLACEHOLDER = {
   day:"今天想做点什么？回车添加…", week:"这周要推进的事…",
   month:"这个月的计划…", year:"今年要实现的目标…"
 };
+
+/* ---------- 应用内弹窗（替代浏览器 prompt / confirm / alert）----------
+   全部返回 Promise，用 await 调用，风格与 App 内其它弹层一致 */
+const dlgMask=()=>document.getElementById("dialogMask");
+function _closeDialog(){ const m=dlgMask(); if(m) m.classList.remove("show"); }
+function _openDialog({title="", msg="", input=false, inputValue="", placeholder="", buttons=[]}){
+  return new Promise(resolve=>{
+    const mask=dlgMask();
+    mask.querySelector("#dialogTitle").textContent=title;
+    const msgEl=mask.querySelector("#dialogMsg");
+    msgEl.textContent=msg; msgEl.style.display=msg?"block":"none";
+    const inp=mask.querySelector("#dialogInput");
+    if(input){
+      inp.style.display="block"; inp.value=inputValue; inp.placeholder=placeholder||"";
+    } else inp.style.display="none";
+    const btnBox=mask.querySelector("#dialogBtns"); btnBox.innerHTML="";
+    const done=(val)=>{ _closeDialog(); mask.onclick=null; document.removeEventListener("keydown",onKey); resolve(val); };
+    buttons.forEach(b=>{
+      const el=document.createElement("div");
+      el.className="btn "+(b.style||"ghost");
+      el.textContent=b.label;
+      el.onclick=()=>done(typeof b.value==="function"? b.value() : b.value);
+      btnBox.appendChild(el);
+    });
+    // 点遮罩空白 = 取消（返回第一个 value 为 null 的按钮结果，否则 null）
+    mask.onclick=(e)=>{ if(e.target===mask) done(null); };
+    const onKey=(e)=>{
+      if(e.key==="Escape") done(null);
+      else if(e.key==="Enter" && input){ const ok=buttons.find(b=>b.enter); if(ok) done(typeof ok.value==="function"? ok.value():ok.value); }
+    };
+    document.addEventListener("keydown",onKey);
+    mask.classList.add("show");
+    if(input) setTimeout(()=>{ inp.focus(); inp.select(); },60);
+  });
+}
+// 提示：只有一个"知道了"按钮
+function dlgAlert(msg,title=""){ return _openDialog({title:title||msg,msg:title?msg:"",buttons:[{label:"知道了",style:"ghost",value:true,enter:true}]}); }
+// 确认：返回 true/false；danger=true 时确认按钮标红
+function dlgConfirm(msg,{title="",okLabel="确定",cancelLabel="取消",danger=false}={}){
+  return _openDialog({title:title||"确认",msg,buttons:[
+    {label:okLabel,style:danger?"dngr":"ghost",value:true,enter:true},
+    {label:cancelLabel,style:"ghost",value:false},
+  ]});
+}
+// 输入：返回字符串（取消返回 null）
+function dlgPrompt(title,{msg="",value="",placeholder="",okLabel="确定"}={}){
+  return _openDialog({title,msg,input:true,inputValue:value,placeholder,buttons:[
+    {label:okLabel,style:"ghost",value:()=>dlgMask().querySelector("#dialogInput").value,enter:true},
+    {label:"取消",style:"ghost",value:null},
+  ]});
+}
 
 /* ---------- 数据 ----------
  state = {
@@ -629,7 +717,7 @@ function save(){
   }catch(e){
     // 存储失败（隐私模式/配额满）时提醒用户，避免以为存上了其实没存
     console.warn("保存失败", e);
-    alert("⚠️ 数据保存失败，可能是浏览器隐私模式或存储空间已满。\n请在普通模式下打开，或清理空间后重试。");
+    dlgAlert("可能是浏览器隐私模式或存储空间已满。\n请在普通模式下打开，或清理空间后重试。","⚠️ 数据保存失败");
     return false;
   }
 }
@@ -765,22 +853,32 @@ function renderTabs(){
 }
 
 // 管理某个清单：重命名 / 删除
-function manageList(i){
+async function manageList(i){
   const list=state.day.lists[i];
-  const act=(prompt(`管理清单「${list.name}」：\n输入新名称可重命名；输入「删除」可删除该清单。`, list.name)||"").trim();
-  if(!act) return;
-  if(act==="删除"){
-    if(state.day.lists.length<=1){ alert("至少保留一个清单"); return; }
+  const act=await _openDialog({
+    title:`管理清单「${list.name}」`,
+    buttons:[
+      {label:"重命名",style:"ghost",value:"rename"},
+      {label:"删除清单",style:"dngr",value:"delete"},
+      {label:"取消",style:"ghost",value:null},
+    ],
+  });
+  if(act==="rename"){
+    const name=(await dlgPrompt("重命名清单",{value:list.name,placeholder:"新的清单名称"})||"").trim();
+    if(name && name!==list.name){ list.name=name; save(); rerender(); }
+  }else if(act==="delete"){
+    if(state.day.lists.length<=1){ await dlgAlert("至少保留一个清单"); return; }
     const cnt=list.tasks.length;
-    if(cnt>0 && !confirm(`确认删除清单「${list.name}」？\n其中 ${cnt} 个任务也会一并删除。`)) return;
+    if(cnt>0){
+      const ok=await dlgConfirm(`其中 ${cnt} 个任务也会一并删除。`,{title:`删除清单「${list.name}」？`,okLabel:"删除",danger:true});
+      if(!ok) return;
+    }
     // 从其它任务的 children 引用里摘掉本清单里的任务
     const ids=list.tasks.map(t=>t.id);
     allTasks().forEach(t=>{ if(t.children) t.children=t.children.filter(id=>!ids.includes(id)); });
     state.day.lists.splice(i,1);
     if(current>=state.day.lists.length) current=state.day.lists.length-1;
     save(); rerender(); goTo(current);
-  }else if(act!==list.name){
-    list.name=act; save(); rerender();
   }
 }
 
@@ -883,9 +981,11 @@ function renderTask(task, listRef, ownerView){
     // 有子节点时提醒会连同下级一起删除
     const kidCount=countDescendants(task);
     const msg = kidCount>0
-      ? `确认删除「${task.text}」？\n这会同时删除它下面的 ${kidCount} 个子任务。`
-      : `确认删除「${task.text}」？`;
-    if(confirm(msg)) removeTask(task, listRef);
+      ? `这会同时删除它下面的 ${kidCount} 个子任务。`
+      : "";
+    dlgConfirm(msg,{title:`删除「${task.text}」？`,okLabel:"删除",danger:true}).then(ok=>{
+      if(ok) removeTask(task, listRef);
+    });
   };
 
   el.appendChild(body); el.appendChild(del);
@@ -1276,7 +1376,7 @@ mvEditSaveEl.onclick=()=>{
   if(!s && !e){ t.manualSpan=null; }
   else{
     const start=s||e, end=e||s;
-    if(end<start){ alert("结束日期不能早于开始日期"); return; }
+    if(end<start){ dlgAlert("结束日期不能早于开始日期"); return; }
     t.manualSpan={ start, end };
   }
   save(); closeMvEdit(); rerender();
@@ -1390,15 +1490,17 @@ function fmtDue(iso){
 function nextViewFor(v){ return {year:"month",month:"week",week:"day"}[v]||null; }
 function breakdown(task, ownerView){
   const nv=nextViewFor(ownerView); if(!nv) return;
-  const text=(prompt(`把「${task.text}」拆解为一条${VIEW_TITLE[nv]}任务：`, "")||"").trim();
-  if(!text) return;
-  const child={ id:uid(), text, done:false, createdAt:Date.now(), due:null, parentText:task.text, children:[], sessions:[] };
-  if(nv==="day"){ child.date=currentDate; state.day.lists[current].tasks.push(child); }
-  else{ state[nv].tasks.push(child); }
-  if(!task.children) task.children=[];
-  task.children.push(child.id);
-  expanded[task.id]=true;   // 拆解后自动展开父节点，立即看到新子项
-  save(); rerender();
+  dlgPrompt(`拆解为一条${VIEW_TITLE[nv]}任务`,{msg:`把「${task.text}」向下拆解`,placeholder:`这条${VIEW_TITLE[nv]}任务是…`}).then(raw=>{
+    const text=(raw||"").trim();
+    if(!text) return;
+    const child={ id:uid(), text, done:false, createdAt:Date.now(), due:null, parentText:task.text, children:[], sessions:[] };
+    if(nv==="day"){ child.date=currentDate; state.day.lists[current].tasks.push(child); }
+    else{ state[nv].tasks.push(child); }
+    if(!task.children) task.children=[];
+    task.children.push(child.id);
+    expanded[task.id]=true;   // 拆解后自动展开父节点，立即看到新子项
+    save(); rerender();
+  });
 }
 
 /* ---------- 添加 ---------- */
@@ -1427,10 +1529,12 @@ function addTask(){
   else singleEl.scrollTop=0;
 }
 function addList(){
-  const name=(prompt("新清单名称：")||"").trim();
-  if(!name) return;
-  state.day.lists.push({name,tasks:[]});
-  save(); current=state.day.lists.length-1; rerender(); goTo(current);
+  dlgPrompt("新建清单",{placeholder:"清单名称，如 工作 / 生活"}).then(raw=>{
+    const name=(raw||"").trim();
+    if(!name) return;
+    state.day.lists.push({name,tasks:[]});
+    save(); current=state.day.lists.length-1; rerender(); goTo(current);
+  });
 }
 
 /* ---------- 时间选择开关 ---------- */
@@ -1716,8 +1820,11 @@ timerDoneEl.onclick=()=>finishTimer(false);
 timerGiveupEl.onclick=()=>{
   if(!timerState) return closeTimer();
   const started=!!timerState.startedAt;
-  if(started && !confirm("放弃这段专注？已进行的时间不会被记录。")) return;
-  timerState=null; persistTimer(); closeTimer(); rerender();
+  if(!started){ timerState=null; persistTimer(); closeTimer(); rerender(); return; }
+  dlgConfirm("已进行的时间不会被记录。",{title:"放弃这段专注？",okLabel:"放弃",danger:true}).then(ok=>{
+    if(!ok) return;
+    timerState=null; persistTimer(); closeTimer(); rerender();
+  });
 };
 timerMaskEl.onclick=(e)=>{ if(e.target===timerMaskEl) closeTimer(); };  // 点空白只收起，不丢弃计时
 
@@ -1748,8 +1855,8 @@ function exportData(){
     setTimeout(()=>URL.revokeObjectURL(url),2000);
   }catch(e){
     // 某些手机浏览器下载受限：退化为复制到剪贴板
-    try{ navigator.clipboard.writeText(json); alert("已复制备份内容到剪贴板，粘贴到备忘录/文件保存即可。"); }
-    catch(_){ prompt("复制下面全部内容并妥善保存：", json); }
+    try{ navigator.clipboard.writeText(json); dlgAlert("已复制备份内容到剪贴板，粘贴到备忘录/文件保存即可。"); }
+    catch(_){ dlgAlert("自动复制失败，请在导出的文件里手动保存。"); }
   }
 }
 function importData(){
@@ -1758,27 +1865,33 @@ function importData(){
   inp.onchange=()=>{
     const f=inp.files&&inp.files[0]; if(!f) return;
     const r=new FileReader();
-    r.onload=()=>{
+    r.onload=async ()=>{
       try{
         const d=JSON.parse(r.result);
         const incoming = d && d.state && d.state.day ? d.state : (d && d.day ? d : null);
         if(!incoming) throw new Error("格式不符");
-        if(!confirm("导入将【覆盖】当前所有任务，确定吗？\n(建议先导出当前数据做备份)")) return;
+        const ok=await dlgConfirm("这会覆盖当前所有任务，建议先导出当前数据做备份。",{title:"导入并覆盖？",okLabel:"覆盖导入",danger:true});
+        if(!ok) return;
         state=incoming;
         if(!save()) return;
         expanded={}; current=0;
         switchView("day");
-        alert("✅ 导入成功，数据已恢复。");
-      }catch(e){ alert("❌ 导入失败：文件格式不正确。请选择本应用导出的备份文件。"); }
+        dlgAlert("数据已恢复。","✅ 导入成功");
+      }catch(e){ dlgAlert("文件格式不正确，请选择本应用导出的备份文件。","❌ 导入失败"); }
     };
     r.readAsText(f);
   };
   inp.click();
 }
 document.getElementById("backupBtn").onclick=()=>{
-  const c=prompt("备份 / 恢复：\n输入 1 = 导出备份文件\n输入 2 = 从备份文件恢复","1");
-  if(c==="1") exportData();
-  else if(c==="2") importData();
+  _openDialog({title:"备份 / 恢复",buttons:[
+    {label:"导出备份文件",style:"ghost",value:"export"},
+    {label:"从备份文件恢复",style:"ghost",value:"import"},
+    {label:"取消",style:"ghost",value:null},
+  ]}).then(c=>{
+    if(c==="export") exportData();
+    else if(c==="import") importData();
+  });
 };
 
 /* ---------- PWA：让它能"装"到手机桌面、离线打开 ---------- */

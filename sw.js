@@ -1,5 +1,5 @@
 // 步步 —— 离线缓存 Service Worker
-const CACHE = "shiguang-v3";
+const CACHE = "shiguang-v4";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
