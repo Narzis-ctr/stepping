@@ -55,12 +55,14 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sub-row .count{font-size:13px;color:var(--sub);flex:0 0 auto;}
   .sub-row .count:not(:empty)::before{content:"·";margin:0 7px;color:var(--line);}
-  .head-tools{display:flex;align-items:center;gap:12px;padding-top:3px;flex:0 0 auto;}
+  /* 右侧工具区：上排图标(时间轴/导出)，下排日期切换，与图标右对齐 */
+  .head-tools{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:0 0 auto;}
+  .head-icons{display:flex;align-items:center;gap:12px;}
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
-  /* 日期切换：右对齐在副标题行末尾，紧凑无边框 */
-  .datenav{display:flex;align-items:center;gap:2px;flex:0 0 auto;margin-left:auto;padding-left:10px;}
+  /* 日期切换：紧凑无边框，右对齐在图标下方 */
+  .datenav{display:flex;align-items:center;gap:2px;flex:0 0 auto;}
   .datenav.hidden{display:none;}
   .datenav .nav-arrow{
     width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -72,8 +74,6 @@
     display:flex;align-items:center;gap:5px;padding:2px 4px;
   }
   .datenav .date-label:active{color:var(--accent);}
-  /* 副标题行里紧跟日期的分隔与文案 */
-  .sub-row .subtitle.after-date{margin-left:0;}
   .tab{
     flex:0 0 auto;padding:7px 15px;border-radius:20px;font-size:14px;font-weight:500;
     background:var(--card);color:var(--sub);border:1px solid var(--line);
@@ -451,16 +451,18 @@
             <span class="subtitle" id="subtitle"></span>
             <span class="count" id="countLabel"></span>
           </div>
-          <div class="datenav hidden" id="datenav">
-            <div class="nav-arrow" id="datePrev">‹</div>
-            <div class="date-label" id="dateLabel">今天</div>
-            <div class="nav-arrow" id="dateNext">›</div>
-          </div>
         </div>
       </div>
       <div class="head-tools">
-        <span class="mode-toggle" id="modeToggle"></span>
-        <span id="backupBtn" title="备份 / 恢复" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></span>
+        <div class="head-icons">
+          <span class="mode-toggle" id="modeToggle"></span>
+          <span id="backupBtn" title="备份 / 恢复" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></span>
+        </div>
+        <div class="datenav hidden" id="datenav">
+          <div class="nav-arrow" id="datePrev">‹</div>
+          <div class="date-label" id="dateLabel">今天</div>
+          <div class="nav-arrow" id="dateNext">›</div>
+        </div>
       </div>
     </div>
     <div class="tabs" id="tabs"></div>
@@ -1575,10 +1577,10 @@ function updateHeader(){
   }else if(view==="day"){
     const list=state.day.lists[current];
     titleEl.textContent=list.name;
-    // 日期已在标题行的 datenav 里显示，副标题只补充"做什么/铺垫"，避免与日期重复
+    // 日期已在标题行右侧的 datenav 里显示，副标题只补充"做什么"，避免与日期重复
     const isToday = currentDate===todayStr();
-    subtitleEl.className="subtitle after-date";
-    subtitleEl.textContent = isToday ? "今天做点什么" : "这天的安排";
+    subtitleEl.className="subtitle";
+    subtitleEl.textContent = isToday ? "今天做点什么" : "这天做点什么";
     const todays=dayTasksOf(list);
     const total=todays.length, done=todays.filter(t=>t.done).length;
     countEl.textContent= total? `${done}/${total} 已完成` : "";
