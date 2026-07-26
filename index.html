@@ -43,12 +43,18 @@
     -webkit-font-smoothing:antialiased;
   }
   /* ---- 顶部标题 + 清单标签栏 ---- */
-  header{padding:calc(var(--safe-top) + 20px) 0 0;background:var(--bg);flex:0 0 auto;}
-  .title-row{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 14px;}
-  .title-row h1{font-size:25px;font-weight:700;margin:0;letter-spacing:-.5px;}
-  .title-wrap{display:flex;flex-direction:column;gap:4px;min-width:0;}
-  .title-wrap .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;}
-  .title-row .count{font-size:13px;color:var(--sub);}
+  header{padding:calc(var(--safe-top) + 22px) 0 0;background:var(--bg);flex:0 0 auto;}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:0 20px 16px;}
+  .title-row h1{font-size:25px;font-weight:700;margin:0;letter-spacing:-.5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .title-row h1.long{font-size:21px;}
+  .title-wrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 auto;}
+  .sub-row{display:flex;align-items:baseline;min-width:0;}
+  .sub-row .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sub-row .count{font-size:13px;color:var(--sub);flex:0 0 auto;}
+  .sub-row .count:not(:empty)::before{content:"·";margin:0 7px;color:var(--line);}
+  .head-tools{display:flex;align-items:center;gap:12px;padding-top:3px;flex:0 0 auto;}
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
@@ -73,8 +79,9 @@
   .tab{
     flex:0 0 auto;padding:7px 15px;border-radius:20px;font-size:14px;font-weight:500;
     background:var(--card);color:var(--sub);border:1px solid var(--line);
-    white-space:nowrap;transition:.2s;cursor:pointer;user-select:none;
-  }
+    white-space:nowrap;transition:.2s;cursor:pointer;user-select:none;max-width:40vw;
+    overflow:hidden;text-overflow:ellipsis;}
+  .tab.long{font-size:12.5px;padding:7px 12px;}
   .tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
   .tab.add-list{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft);font-weight:600;}
   /* ---- 主体区域 ---- */
@@ -319,13 +326,6 @@
   .tl-bar-fill{height:100%;border-radius:5px;transition:width .3s;}
   .tl-total{text-align:center;font-size:13px;color:var(--sub);margin:2px 0 24px;}
 
-  /* ---- 视图内 清单/概览 切换（点击文字切换，不用胶囊） ---- */
-  .ov-switch{display:flex;align-items:center;gap:18px;padding:2px 4px 12px;}
-  .ov-switch .ov-seg{font-size:15px;font-weight:600;color:var(--sub);cursor:pointer;user-select:none;
-    position:relative;padding:2px 0;transition:color .15s;}
-  .ov-switch .ov-seg.on{color:var(--ink);}
-  .ov-switch .ov-seg.on::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:2.5px;
-    border-radius:2px;background:var(--accent);}
   /* ---- 月度概览（甘特式跨度条） ---- */
   .mv-wrap{padding:6px 0 12px;}
   .mv-monthbar{display:flex;align-items:center;justify-content:center;gap:16px;margin:2px 0 14px;}
@@ -436,20 +436,22 @@
     <div class="title-row">
       <div class="title-wrap">
         <h1 id="listTitle">日程</h1>
-        <span class="subtitle" id="subtitle"></span>
+        <div class="sub-row">
+          <span class="subtitle" id="subtitle"></span>
+          <span class="count" id="countLabel"></span>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;padding-top:4px;">
-        <span class="count" id="countLabel"></span>
-        <span class="mode-toggle" id="modeToggle" title="切换 清单 / 时间轴"></span>
+      <div class="head-tools">
+        <span class="mode-toggle" id="modeToggle"></span>
         <span id="backupBtn" title="备份 / 恢复" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></span>
       </div>
     </div>
-    <div class="tabs" id="tabs"></div>
     <div class="datebar" id="datebar">
       <div class="nav-arrow" id="datePrev">‹</div>
       <div class="date-label" id="dateLabel">今天</div>
       <div class="nav-arrow" id="dateNext">›</div>
     </div>
+    <div class="tabs" id="tabs"></div>
   </header>
 
   <!-- 月历弹层：点日期文字展开，可翻月、点日期跳转 -->
@@ -900,7 +902,7 @@ function renderTabs(){
   tabsEl.innerHTML="";
   state.day.lists.forEach((list,i)=>{
     const t=document.createElement("div");
-    t.className="tab"+(i===current?" active":"");
+    t.className="tab"+(i===current?" active":"")+((list.name||"").length>=5?" long":"");
     t.textContent=list.name;
     t.onclick=()=>{
       // 再次点击已激活的清单 → 打开管理菜单（重命名 / 删除）
@@ -1132,24 +1134,11 @@ function renderDay(){
 }
 function renderSingle(){
   singleEl.innerHTML="";
-  // 周/月/年：顶部放"清单 / 概览"点击切换（文字下划线，非胶囊）
-  const ovLabel={week:"本周概览",month:"本月概览",year:"年度概览"}[view];
-  singleEl.appendChild(ovSwitchBar(view,"list",ovLabel));
+  // 周/月/年清单：概览切换已挪到顶部小图标，这里只渲染清单本身
   const box=document.createElement("div");
   const emptyHint={week:"从年/月目标拆解，或直接添加",month:"从年度目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||"";
   fillList(box, state[view].tasks, view, "还没有内容<br>"+emptyHint);
   singleEl.appendChild(box);
-}
-// 视图内的"清单 / 概览"切换条：点击文字切换（下划线高亮）
-function ovSwitchBar(v, active, ovLabel){
-  const bar=document.createElement("div");
-  bar.className="ov-switch";
-  bar.innerHTML=`<div class="ov-seg${active==='list'?' on':''}" data-m="list">清单</div>
-    <div class="ov-seg${active==='overview'?' on':''}" data-m="overview">${ovLabel}</div>`;
-  bar.querySelectorAll(".ov-seg").forEach(seg=>{
-    seg.onclick=()=>{ ovMode[v]=seg.dataset.m; rerender(); };
-  });
-  return bar;
 }
 
 /* ---------- 时间轴：把某天的专注 session 按墙钟排布 ---------- */
@@ -1344,8 +1333,6 @@ function monthSpanOf(task, ym){
 // 月计划额外带"翻月"条，其它视图不带
 function renderOverview(v){
   singleEl.innerHTML="";
-  const ovLabel={week:"本周概览",month:"本月概览",year:"年度概览"}[v];
-  singleEl.appendChild(ovSwitchBar(v,"overview",ovLabel));
   const wrap=document.createElement("div");
   wrap.className="mv-wrap";
 
@@ -1499,19 +1486,28 @@ const ICON_TL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const ICON_PIE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9V3z"/><path d="M12 3v9h9"/></svg>';
 const ICON_BAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg>';
 const ICON_GANTT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M4 12h13M4 18h6"/></svg>';
+// 概览图标（分组卡片总览）：给周/月/年做"清单 ↔ 概览"切换用
+const ICON_OV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="4" rx="1.5"/><rect x="14" y="12" width="7" height="8" rx="1.5"/><rect x="3" y="15" width="7" height="5" rx="1.5"/></svg>';
 function syncModeToggle(){
-  // 日程：清单 / 时间轴（放顶部）；月计划的概览切换已挪进内容区，其它视图不显示
+  // 顶部小图标：日程=清单/时间轴切换；周/月/年=清单/概览切换
+  modeToggleEl.style.display="flex";
   if(view==="day"){
-    modeToggleEl.style.display="flex";
     modeToggleEl.innerHTML = dayMode==="list" ? ICON_TL : ICON_LIST;
     modeToggleEl.classList.toggle("on", dayMode==="timeline");
     modeToggleEl.title = dayMode==="list" ? "看时间轴" : "回到清单";
   }else{
-    modeToggleEl.style.display="none";
+    const ov = ovMode[view]==="overview";
+    modeToggleEl.innerHTML = ov ? ICON_LIST : ICON_OV;
+    modeToggleEl.classList.toggle("on", ov);
+    modeToggleEl.title = ov ? "回到清单" : "看概览";
   }
 }
 modeToggleEl.onclick=()=>{
-  if(view==="day") dayMode = dayMode==="list" ? "timeline" : "list";
+  if(view==="day"){
+    dayMode = dayMode==="list" ? "timeline" : "list";
+  }else{
+    ovMode[view] = ovMode[view]==="overview" ? "list" : "overview";
+  }
   rerender();
 };
 
@@ -1552,11 +1548,18 @@ function updateHeader(){
     const total=todays.length, done=todays.filter(t=>t.done).length;
     countEl.textContent= total? `${done}/${total} 已完成` : "";
   }else{
+    const ov = ovMode[view]==="overview";
     titleEl.textContent=VIEW_TITLE[view];
-    subtitleEl.textContent={week:"这周要推进点什么",month:"这个月准备达成什么",year:"今年最重要的目标"}[view]||"";
+    if(ov){
+      subtitleEl.textContent={week:"本周概览",month:"本月概览",year:"年度概览"}[view]||"";
+    }else{
+      subtitleEl.textContent={week:"这周要推进点什么",month:"这个月准备达成什么",year:"今年最重要的目标"}[view]||"";
+    }
     const arr=state[view].tasks, done=arr.filter(t=>t.done).length;
     countEl.textContent= arr.length? `${done}/${arr.length} 已完成` : "";
   }
+  // 标题过长自动缩字号（清单名可能较长）
+  titleEl.classList.toggle("long", (titleEl.textContent||"").length>=6);
 }
 
 /* ---------- 时长格式：秒 → Xh Ym / Ym ---------- */
