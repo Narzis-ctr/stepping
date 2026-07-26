@@ -50,6 +50,7 @@
   .title-row h1.long{font-size:21px;}
   .title-wrap{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 auto;}
   .sub-row{display:flex;align-items:center;min-width:0;gap:2px;}
+  .sub-row .sub-left{display:flex;align-items:center;min-width:0;flex:1 1 auto;gap:2px;}
   .sub-row .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sub-row .count{font-size:13px;color:var(--sub);flex:0 0 auto;}
@@ -58,8 +59,8 @@
   .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
-  /* 日期切换：内嵌在副标题行，紧凑无边框，读作标题的一部分 */
-  .datenav{display:flex;align-items:center;gap:3px;flex:0 0 auto;}
+  /* 日期切换：右对齐在副标题行末尾，紧凑无边框 */
+  .datenav{display:flex;align-items:center;gap:2px;flex:0 0 auto;margin-left:auto;padding-left:10px;}
   .datenav.hidden{display:none;}
   .datenav .nav-arrow{
     width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -72,8 +73,7 @@
   }
   .datenav .date-label:active{color:var(--accent);}
   /* 副标题行里紧跟日期的分隔与文案 */
-  .sub-row .subtitle.after-date{margin-left:8px;}
-  .sub-row .subtitle.after-date:not(:empty)::before{content:"·";margin-right:8px;color:var(--line);}
+  .sub-row .subtitle.after-date{margin-left:0;}
   .tab{
     flex:0 0 auto;padding:7px 15px;border-radius:20px;font-size:14px;font-weight:500;
     background:var(--card);color:var(--sub);border:1px solid var(--line);
@@ -90,7 +90,7 @@
   /* ---- 任务卡片 ---- */
   .task{
     display:flex;align-items:flex-start;gap:11px;background:var(--card);
-    border-radius:14px;padding:9px 15px;margin-top:7px;box-shadow:var(--shadow);
+    border-radius:14px;padding:9px 28px 9px 15px;margin-top:7px;box-shadow:var(--shadow);
     transition:.15s;position:relative;
   }
   .task:active{transform:scale(.99);}
@@ -136,11 +136,19 @@
   .chip.parent{background:transparent;color:var(--sub);padding-left:2px;}
   .chip.break{background:transparent;border:1px dashed var(--line);color:var(--sub);cursor:pointer;font-weight:500;}
   .chip.break:active{background:var(--accent-soft);}
-  .chip.focus{background:var(--accent-soft);border:none;color:var(--accent);cursor:pointer;font-weight:600;
-    font-size:12.5px;padding:5px 13px;border-radius:11px;gap:5px;}
-  .chip.focus:active{transform:scale(.96);}
-  .chip.focused{background:var(--accent-soft);color:var(--accent);font-weight:600;}
-  .del{flex:0 0 auto;color:var(--sub);font-size:19px;line-height:1;padding:2px 3px;cursor:pointer;opacity:.3;margin-top:1px;}
+  /* 专注：日程叶子任务专用，绝对定位到卡片右侧空白、垂直居中的圆形按钮 */
+  .focus-btn{
+    position:absolute;right:13px;top:50%;transform:translateY(-50%);
+    width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
+    transition:.15s;
+  }
+  .focus-btn svg{width:16px;height:16px;display:block;margin-left:1px;}
+  .focus-btn:active{transform:translateY(-50%) scale(.9);background:var(--accent);color:#fff;}
+  /* 有专注按钮的卡片：右侧留出圆钮空间，文字不与之重叠 */
+  .task.has-focus{padding-right:60px;}
+  .del{position:absolute;top:7px;right:9px;color:var(--sub);font-size:14px;line-height:1;
+    padding:3px;cursor:pointer;opacity:.28;}
   .del:active{opacity:1;color:var(--danger);}
   .empty{text-align:center;color:var(--sub);font-size:14px;margin-top:70px;line-height:2;}
   .empty .big{font-size:44px;display:block;margin-bottom:8px;}
@@ -439,13 +447,15 @@
       <div class="title-wrap">
         <h1 id="listTitle">日程</h1>
         <div class="sub-row">
+          <div class="sub-left">
+            <span class="subtitle" id="subtitle"></span>
+            <span class="count" id="countLabel"></span>
+          </div>
           <div class="datenav hidden" id="datenav">
             <div class="nav-arrow" id="datePrev">‹</div>
             <div class="date-label" id="dateLabel">今天</div>
             <div class="nav-arrow" id="dateNext">›</div>
           </div>
-          <span class="subtitle" id="subtitle"></span>
-          <span class="count" id="countLabel"></span>
         </div>
       </div>
       <div class="head-tools">
@@ -1053,18 +1063,18 @@ function renderTask(task, listRef, ownerView){
     b.onclick=(e)=>{ e.stopPropagation(); breakdown(task, ownerView); };
     tags.appendChild(b);
   }
-  // 专注：仅日程叶子任务、且看的是今天，才给"开始番茄钟"入口（放大、更醒目）
-  //      卡片上不再堆叠已专注时长（那是时间轴/统计的事），保持卡片清爽
-  if(ownerView==="day" && !hasKids && currentDate===todayStr()){
-    const focusSec=(task.sessions||[]).reduce((s,x)=>s+(x.focusSec||0),0);
-    const f=document.createElement("span");
-    f.className="chip focus";
-    // 已专注过 → 按钮里带上时长，一处呈现：▶ 专注 · 25分钟
-    f.textContent = focusSec>0 ? `▶ 专注 · ${fmtDur(focusSec)}` : "▶ 专注";
-    f.onclick=(e)=>{ e.stopPropagation(); openTimer(task); };
-    tags.appendChild(f);
-  }
   if(tags.children.length) body.appendChild(tags);
+
+  // 专注按钮：仅日程叶子任务、且看的是今天。绝对定位到卡片右侧空白居中，圆形图标钮
+  //           不显示"已专注 X 分钟"——那是时间轴/统计该呈现的，卡片保持清爽
+  let focusBtn=null;
+  if(ownerView==="day" && !hasKids && currentDate===todayStr()){
+    el.classList.add("has-focus");
+    focusBtn=document.createElement("div");
+    focusBtn.className="focus-btn"; focusBtn.title="开始专注";
+    focusBtn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    focusBtn.onclick=(e)=>{ e.stopPropagation(); openTimer(task); };
+  }
 
   const del=document.createElement("div");
   del.className="del"; del.textContent="×";
@@ -1081,6 +1091,7 @@ function renderTask(task, listRef, ownerView){
   };
 
   el.appendChild(body); el.appendChild(del);
+  if(focusBtn) el.appendChild(focusBtn);
   wrap.appendChild(el);
 
   // 子节点（展开时递归渲染，能看到下一级完成情况）
@@ -1088,7 +1099,7 @@ function renderTask(task, listRef, ownerView){
     const box=document.createElement("div");
     box.className="children";
     const childView=nextViewFor(ownerView);
-    const sorted=[...kids].sort((a,b)=>(a.done?1:0)-(b.done?1:0) || b.createdAt-a.createdAt);
+    const sorted=[...kids].sort((a,b)=>(isDoneEffective(a)?1:0)-(isDoneEffective(b)?1:0) || b.createdAt-a.createdAt);
     sorted.forEach(k=> box.appendChild(renderTask(k, findListRef(k), childView)));
     wrap.appendChild(box);
   }
@@ -1120,13 +1131,22 @@ function findListRef(task){
   return [];
 }
 
+/* 任务是否"实际完成"：叶子看 done；父节点看所有后代叶子是否全完成（用于排序沉底） */
+function isDoneEffective(task){
+  if(task.done) return true;
+  const p=progressOf(task);
+  return !p.leaf && p.total>0 && p.done>=p.total;
+}
 function fillList(container, tasks, ownerView, emptyText){
   container.innerHTML="";
   if(!tasks.length){
     container.innerHTML='<div class="empty"><span class="big">🌿</span>'+emptyText+'</div>';
     return;
   }
-  const sorted=[...tasks].sort((a,b)=>(a.done?1:0)-(b.done?1:0) || (a.due&&b.due? new Date(a.due)-new Date(b.due) : b.createdAt-a.createdAt));
+  // 已完成的自动沉底；未完成内部按时间/新建排序
+  const sorted=[...tasks].sort((a,b)=>
+    (isDoneEffective(a)?1:0)-(isDoneEffective(b)?1:0)
+    || (a.due&&b.due? new Date(a.due)-new Date(b.due) : b.createdAt-a.createdAt));
   sorted.forEach(t=>container.appendChild(renderTask(t, tasks, ownerView)));
 }
 
