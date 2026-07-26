@@ -42,17 +42,17 @@
     -webkit-font-smoothing:antialiased;
   }
   /* ---- 顶部标题 + 清单标签栏 ---- */
-  header{padding:calc(var(--safe-top) + 14px) 0 0;background:var(--bg);flex:0 0 auto;}
-  .title-row{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 12px;}
-  .title-row h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.5px;}
-  .title-wrap{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  header{padding:calc(var(--safe-top) + 10px) 0 0;background:var(--bg);flex:0 0 auto;}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 10px;}
+  .title-row h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.5px;}
+  .title-wrap{display:flex;flex-direction:column;gap:2px;min-width:0;}
   .title-wrap .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;}
   .title-row .count{font-size:13px;color:var(--sub);}
-  .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 10px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
   /* 日期切换条（仅日程视图显示） */
-  .datebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px 12px;}
+  .datebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px 10px;}
   .datebar.hidden{display:none;}
   .datebar .nav-arrow{
     width:32px;height:32px;border-radius:50%;background:var(--card);border:1px solid var(--line);
@@ -319,6 +319,10 @@
   .tl-total{text-align:center;font-size:13px;color:var(--sub);margin:2px 0 24px;}
 
   /* ---- 月度概览（甘特式跨度条） ---- */
+  .mv-switch{display:flex;gap:4px;background:var(--card);border-radius:12px;padding:4px;margin:4px 2px 12px;box-shadow:var(--shadow);}
+  .mv-switch .mv-seg{flex:1 1 0;text-align:center;padding:8px 0;border-radius:9px;font-size:14px;
+    font-weight:500;color:var(--sub);cursor:pointer;user-select:none;transition:.15s;}
+  .mv-switch .mv-seg.on{background:var(--accent);color:#fff;font-weight:600;}
   .mv-wrap{padding:6px 0 12px;}
   .mv-monthbar{display:flex;align-items:center;justify-content:center;gap:16px;margin:2px 0 14px;}
   .mv-monthbar .nav-arrow{
@@ -595,8 +599,8 @@ const TIMER_KEY = "shiguang.timer";   // 活动中的番茄钟，刷新/切后�
 const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
 const VIEW_TITLE = { day:"日程", week:"周计划", month:"月计划", year:"年度目标" };
 const VIEW_PLACEHOLDER = {
-  day:"今天想做点什么？回车添加…", week:"这周要推进的事…",
-  month:"这个月的计划…", year:"今年要实现的目标…"
+  day:"回车添加…", week:"回车添加…",
+  month:"回车添加…", year:"回车添加…"
 };
 
 /* ---------- 应用内弹窗（替代浏览器 prompt / confirm / alert）----------
@@ -1123,8 +1127,29 @@ function renderDay(){
   layout();
 }
 function renderSingle(){
+  // 月计划：列表顶部放一个"清单 / 本月概览"切换条
+  if(view==="month"){
+    singleEl.innerHTML="";
+    singleEl.appendChild(mvSwitchBar("list"));
+    const box=document.createElement("div");
+    fillList(box, state.month.tasks, "month",
+      "还没有内容<br>从年度目标拆解，或直接添加");
+    singleEl.appendChild(box);
+    return;
+  }
   fillList(singleEl, state[view].tasks, view,
-    "还没有内容<br>"+({week:"从年/月目标拆解，或直接添加",month:"从年度目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||""));
+    "还没有内容<br>"+({week:"从年/月目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||""));
+}
+// 月计划视图内的"清单 / 本月概览"切换条
+function mvSwitchBar(active){
+  const bar=document.createElement("div");
+  bar.className="mv-switch";
+  bar.innerHTML=`<div class="mv-seg${active==='list'?' on':''}" data-m="list">清单</div>
+    <div class="mv-seg${active==='overview'?' on':''}" data-m="overview">本月概览</div>`;
+  bar.querySelectorAll(".mv-seg").forEach(seg=>{
+    seg.onclick=()=>{ monthMode=seg.dataset.m; rerender(); };
+  });
+  return bar;
 }
 
 /* ---------- 时间轴：把某天的专注 session 按墙钟排布 ---------- */
@@ -1317,6 +1342,7 @@ function monthSpanOf(task, ym){
 }
 function renderMonthOverview(){
   singleEl.innerHTML="";
+  singleEl.appendChild(mvSwitchBar("overview"));
   const wrap=document.createElement("div");
   wrap.className="mv-wrap";
 
@@ -1436,24 +1462,18 @@ const ICON_PIE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const ICON_BAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg>';
 const ICON_GANTT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M4 12h13M4 18h6"/></svg>';
 function syncModeToggle(){
-  // 日程：清单 / 时间轴；月计划：清单 / 月度概览。其它视图不显示
+  // 日程：清单 / 时间轴（放顶部）；月计划的概览切换已挪进内容区，其它视图不显示
   if(view==="day"){
     modeToggleEl.style.display="flex";
     modeToggleEl.innerHTML = dayMode==="list" ? ICON_TL : ICON_LIST;
     modeToggleEl.classList.toggle("on", dayMode==="timeline");
     modeToggleEl.title = dayMode==="list" ? "看时间轴" : "回到清单";
-  }else if(view==="month"){
-    modeToggleEl.style.display="flex";
-    modeToggleEl.innerHTML = monthMode==="list" ? ICON_GANTT : ICON_LIST;
-    modeToggleEl.classList.toggle("on", monthMode==="overview");
-    modeToggleEl.title = monthMode==="list" ? "看本月概览" : "回到清单";
   }else{
     modeToggleEl.style.display="none";
   }
 }
 modeToggleEl.onclick=()=>{
   if(view==="day") dayMode = dayMode==="list" ? "timeline" : "list";
-  else if(view==="month") monthMode = monthMode==="list" ? "overview" : "list";
   rerender();
 };
 
@@ -1464,11 +1484,8 @@ function rerender(){
     renderTimeline();
   }else if(view==="day"){
     trackEl.style.display=""; singleEl.style.display="none";
-    // 日程视图：输入框提示随所选日期变化
-    const isToday = currentDate===todayStr();
-    inputEl.placeholder = isToday ? "今天想做点什么？回车添加…"
-      : (currentDate===shiftDate(todayStr(),1) ? "明天要做点什么？回车添加…"
-      : `安排「${fmtDateLabel(currentDate).split(" · ").pop()}」的任务，回车添加…`);
+    // 日程视图：输入框只留"回车添加"，具体是哪天由上方副标题体现，避免与副标题重复
+    inputEl.placeholder = "回车添加…";
     renderDay();
   }else if(view==="month" && monthMode==="overview"){
     trackEl.style.display="none"; singleEl.style.display="block";
@@ -1490,8 +1507,8 @@ function updateHeader(){
     const list=state.day.lists[current];
     titleEl.textContent=list.name;
     const isToday = currentDate===todayStr();
-    subtitleEl.textContent = isToday ? "今天想做点什么？"
-      : (currentDate===shiftDate(todayStr(),1) ? "明天要做点什么？"
+    subtitleEl.textContent = isToday ? "今天做点什么"
+      : (currentDate===shiftDate(todayStr(),1) ? "明天做点什么"
       : `安排「${fmtDateLabel(currentDate).split(" · ").pop()}」`);
     const todays=dayTasksOf(list);
     const total=todays.length, done=todays.filter(t=>t.done).length;
@@ -1502,7 +1519,7 @@ function updateHeader(){
     countEl.textContent="";
   }else{
     titleEl.textContent=VIEW_TITLE[view];
-    subtitleEl.textContent={week:"这周要推进什么？",month:"这个月的重点",year:"今年最重要的目标"}[view]||"";
+    subtitleEl.textContent={week:"这周要推进点什么",month:"这个月准备达成什么",year:"今年最重要的目标"}[view]||"";
     const arr=state[view].tasks, done=arr.filter(t=>t.done).length;
     countEl.textContent= arr.length? `${done}/${arr.length} 已完成` : "";
   }
