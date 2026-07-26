@@ -1,6 +1,6 @@
 // 步步 —— 离线缓存 Service Worker
-const CACHE = "shiguang-v5";
-const ASSETS = ["./", "./index.html", "./manifest.json"];
+const CACHE = "shiguang-v6";
+const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./favicon-32.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();

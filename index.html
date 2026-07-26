@@ -8,8 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="步步" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#f4f8fd" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%235b9df0'/%3E%3Cpath d='M150 262l68 68 146-160' fill='none' stroke='white' stroke-width='42' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%235b9df0'/%3E%3Cpath d='M150 262l68 68 146-160' fill='none' stroke='white' stroke-width='42' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <link rel="manifest" href="manifest.json" />
 <title>步步</title>
 <style>
@@ -42,17 +43,17 @@
     -webkit-font-smoothing:antialiased;
   }
   /* ---- 顶部标题 + 清单标签栏 ---- */
-  header{padding:calc(var(--safe-top) + 10px) 0 0;background:var(--bg);flex:0 0 auto;}
-  .title-row{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 10px;}
-  .title-row h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.5px;}
-  .title-wrap{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  header{padding:calc(var(--safe-top) + 20px) 0 0;background:var(--bg);flex:0 0 auto;}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;padding:0 20px 14px;}
+  .title-row h1{font-size:25px;font-weight:700;margin:0;letter-spacing:-.5px;}
+  .title-wrap{display:flex;flex-direction:column;gap:4px;min-width:0;}
   .title-wrap .subtitle{font-size:13px;color:var(--sub);font-weight:400;line-height:1.2;}
   .title-row .count{font-size:13px;color:var(--sub);}
-  .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 10px;scrollbar-width:none;}
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tabs.hidden{display:none;}
   /* 日期切换条（仅日程视图显示） */
-  .datebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px 10px;}
+  .datebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px 12px;}
   .datebar.hidden{display:none;}
   .datebar .nav-arrow{
     width:32px;height:32px;border-radius:50%;background:var(--card);border:1px solid var(--line);
@@ -318,11 +319,14 @@
   .tl-bar-fill{height:100%;border-radius:5px;transition:width .3s;}
   .tl-total{text-align:center;font-size:13px;color:var(--sub);margin:2px 0 24px;}
 
+  /* ---- 视图内 清单/概览 切换（点击文字切换，不用胶囊） ---- */
+  .ov-switch{display:flex;align-items:center;gap:18px;padding:2px 4px 12px;}
+  .ov-switch .ov-seg{font-size:15px;font-weight:600;color:var(--sub);cursor:pointer;user-select:none;
+    position:relative;padding:2px 0;transition:color .15s;}
+  .ov-switch .ov-seg.on{color:var(--ink);}
+  .ov-switch .ov-seg.on::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:2.5px;
+    border-radius:2px;background:var(--accent);}
   /* ---- 月度概览（甘特式跨度条） ---- */
-  .mv-switch{display:flex;gap:4px;background:var(--card);border-radius:12px;padding:4px;margin:4px 2px 12px;box-shadow:var(--shadow);}
-  .mv-switch .mv-seg{flex:1 1 0;text-align:center;padding:8px 0;border-radius:9px;font-size:14px;
-    font-weight:500;color:var(--sub);cursor:pointer;user-select:none;transition:.15s;}
-  .mv-switch .mv-seg.on{background:var(--accent);color:#fff;font-weight:600;}
   .mv-wrap{padding:6px 0 12px;}
   .mv-monthbar{display:flex;align-items:center;justify-content:center;gap:16px;margin:2px 0 14px;}
   .mv-monthbar .nav-arrow{
@@ -668,7 +672,7 @@ let current = 0;       // 日程内当前清单索引
 let useTime = false;   // 是否展开时间选择
 let currentDate = todayStr();   // 日程当前查看的日期
 let dayMode = "list";  // 日程视图：list 清单 | timeline 时间轴
-let monthMode = "list"; // 月计划视图：list 清单 | overview 本月概览
+let ovMode = { week:"list", month:"list", year:"list" }; // 周/月/年：list 清单 | overview 概览
 let chartMode = "pie"; // 专注分布图：pie 扇形 | bar 条形
 let mvMonth = todayStr().slice(0,7);   // 月度概览当前查看的月份 YYYY-MM
 let pendingParentId = null;   // 新任务待挂靠的上级目标 id
@@ -1127,27 +1131,23 @@ function renderDay(){
   layout();
 }
 function renderSingle(){
-  // 月计划：列表顶部放一个"清单 / 本月概览"切换条
-  if(view==="month"){
-    singleEl.innerHTML="";
-    singleEl.appendChild(mvSwitchBar("list"));
-    const box=document.createElement("div");
-    fillList(box, state.month.tasks, "month",
-      "还没有内容<br>从年度目标拆解，或直接添加");
-    singleEl.appendChild(box);
-    return;
-  }
-  fillList(singleEl, state[view].tasks, view,
-    "还没有内容<br>"+({week:"从年/月目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||""));
+  singleEl.innerHTML="";
+  // 周/月/年：顶部放"清单 / 概览"点击切换（文字下划线，非胶囊）
+  const ovLabel={week:"本周概览",month:"本月概览",year:"年度概览"}[view];
+  singleEl.appendChild(ovSwitchBar(view,"list",ovLabel));
+  const box=document.createElement("div");
+  const emptyHint={week:"从年/月目标拆解，或直接添加",month:"从年度目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||"";
+  fillList(box, state[view].tasks, view, "还没有内容<br>"+emptyHint);
+  singleEl.appendChild(box);
 }
-// 月计划视图内的"清单 / 本月概览"切换条
-function mvSwitchBar(active){
+// 视图内的"清单 / 概览"切换条：点击文字切换（下划线高亮）
+function ovSwitchBar(v, active, ovLabel){
   const bar=document.createElement("div");
-  bar.className="mv-switch";
-  bar.innerHTML=`<div class="mv-seg${active==='list'?' on':''}" data-m="list">清单</div>
-    <div class="mv-seg${active==='overview'?' on':''}" data-m="overview">本月概览</div>`;
-  bar.querySelectorAll(".mv-seg").forEach(seg=>{
-    seg.onclick=()=>{ monthMode=seg.dataset.m; rerender(); };
+  bar.className="ov-switch";
+  bar.innerHTML=`<div class="ov-seg${active==='list'?' on':''}" data-m="list">清单</div>
+    <div class="ov-seg${active==='overview'?' on':''}" data-m="overview">${ovLabel}</div>`;
+  bar.querySelectorAll(".ov-seg").forEach(seg=>{
+    seg.onclick=()=>{ ovMode[v]=seg.dataset.m; rerender(); };
   });
   return bar;
 }
@@ -1340,44 +1340,82 @@ function monthSpanOf(task, ym){
   return { dim, start:sd, end:ed, manual, activeDays:inMonth, doneInMonth, isDone, status, prog,
            dayNum:d=>Number(d.slice(8,10)) };
 }
-function renderMonthOverview(){
+// 概览：周/月/年通用。按状态分组（进行中 / 已完成 / 未完成）成卡片列表
+// 月计划额外带"翻月"条，其它视图不带
+function renderOverview(v){
   singleEl.innerHTML="";
-  singleEl.appendChild(mvSwitchBar("overview"));
+  const ovLabel={week:"本周概览",month:"本月概览",year:"年度概览"}[v];
+  singleEl.appendChild(ovSwitchBar(v,"overview",ovLabel));
   const wrap=document.createElement("div");
   wrap.className="mv-wrap";
 
-  // 月份切换条（前后翻月）
-  const mbar=document.createElement("div");
-  mbar.className="mv-monthbar";
-  mbar.innerHTML=`<div class="nav-arrow" id="mvPrev">‹</div>
-    <div class="mv-month-label">${fmtMonthLabel(mvMonth)}</div>
-    <div class="nav-arrow" id="mvNext">›</div>`;
-  wrap.appendChild(mbar);
-  mbar.querySelector("#mvPrev").onclick=()=>{ mvMonth=shiftMonth(mvMonth,-1); rerender(); };
-  mbar.querySelector("#mvNext").onclick=()=>{ mvMonth=shiftMonth(mvMonth,1); rerender(); };
+  // 月计划：保留翻月条（跨度按所选月计算）；周/年不翻
+  if(v==="month"){
+    const mbar=document.createElement("div");
+    mbar.className="mv-monthbar";
+    mbar.innerHTML=`<div class="nav-arrow" id="mvPrev">‹</div>
+      <div class="mv-month-label">${fmtMonthLabel(mvMonth)}</div>
+      <div class="nav-arrow" id="mvNext">›</div>`;
+    wrap.appendChild(mbar);
+    mbar.querySelector("#mvPrev").onclick=()=>{ mvMonth=shiftMonth(mvMonth,-1); rerender(); };
+    mbar.querySelector("#mvNext").onclick=()=>{ mvMonth=shiftMonth(mvMonth,1); rerender(); };
+  }
 
-  const tasks=state.month.tasks||[];
+  const tasks=state[v].tasks||[];
   if(!tasks.length){
     const e=document.createElement("div");
     e.className="mv-empty";
-    e.innerHTML='<span class="big">🗓️</span>这个月还没有目标<br>切回清单先写下这个月要推进的事';
+    const emptyMsg={week:"这周还没有目标",month:"这个月还没有目标",year:"今年还没有目标"}[v];
+    e.innerHTML=`<span class="big">🗓️</span>${emptyMsg}<br>切回清单先写下要推进的事`;
     wrap.appendChild(e);
     singleEl.appendChild(wrap);
     return;
   }
 
-  // 按状态分组：进行中 / 已完成 / 还没动
+  // 按状态分组：进行中 / 已完成 / 未完成
   const groups={doing:[],done:[],idle:[]};
-  tasks.forEach(t=>groups[monthSpanOf(t,mvMonth).status].push(t));
-  const order=[["doing","进行中"],["done","已完成"],["idle","还没动"]];
+  tasks.forEach(t=>groups[ovStatusOf(t,v).status].push(t));
+  const order=[["doing","进行中"],["done","已完成"],["idle","未完成"]];
   order.forEach(([key,label])=>{
     if(!groups[key].length) return;
     const lb=document.createElement("div");
     lb.className="mv-group-label"; lb.textContent=`${label}（${groups[key].length}）`;
     wrap.appendChild(lb);
-    groups[key].forEach(t=>wrap.appendChild(renderMvRow(t)));
+    groups[key].forEach(t=>wrap.appendChild(renderOvRow(t,v)));
   });
   singleEl.appendChild(wrap);
+}
+// 目标的概览状态：月计划用 monthSpanOf（带活动日）；周/年只判进行中/完成/未动
+function ovStatusOf(task,v){
+  if(v==="month") return monthSpanOf(task, mvMonth);
+  const prog=progressOf(task);
+  const isDone = prog.total>0 && prog.done>=prog.total;
+  // 有子任务活动过（任一后代叶子有 date/session/完成）视为进行中
+  const active = activeDatesOf(task).size>0 || prog.done>0;
+  const status = isDone ? "done" : (active ? "doing" : "idle");
+  return { prog, isDone, status };
+}
+// 周/年概览行：目标名 + 状态徽章 + X/Y 项完成（不含铺在哪几天，那是月计划专属）
+function renderOvRow(task,v){
+  if(v==="month") return renderMvRow(task);
+  const info=ovStatusOf(task,v);
+  const col=colorOf(task.id);
+  const row=document.createElement("div");
+  row.className="mv-row"+(info.isDone?" done":"");
+  const top=document.createElement("div");
+  top.className="mv-row-top";
+  const badgeText={doing:"进行中",done:"已完成",idle:"未完成"}[info.status];
+  top.innerHTML=`<span class="mv-color-dot" style="background:${col}"></span>
+    <span class="mv-name">${escapeHtml(task.text)}</span>
+    <span class="mv-badge ${info.status}">${badgeText}</span>`;
+  row.appendChild(top);
+  if(info.prog.total>0){
+    const meta=document.createElement("div");
+    meta.className="mv-meta";
+    meta.innerHTML=`<span>已完成 ${info.prog.done}/${info.prog.total} 项</span>`;
+    row.appendChild(meta);
+  }
+  return row;
 }
 // 把活动日数组压成一句可读文字："铺在 3日、5日、8日" / "3日–10日（手动）"
 function fmtSpread(info){
@@ -1487,9 +1525,9 @@ function rerender(){
     // 日程视图：输入框只留"回车添加"，具体是哪天由上方副标题体现，避免与副标题重复
     inputEl.placeholder = "回车添加…";
     renderDay();
-  }else if(view==="month" && monthMode==="overview"){
+  }else if(view!=="day" && ovMode[view]==="overview"){
     trackEl.style.display="none"; singleEl.style.display="block";
-    renderMonthOverview();
+    renderOverview(view);
   }else{
     trackEl.style.display="none"; singleEl.style.display="block";
     renderSingle();
@@ -1513,10 +1551,6 @@ function updateHeader(){
     const todays=dayTasksOf(list);
     const total=todays.length, done=todays.filter(t=>t.done).length;
     countEl.textContent= total? `${done}/${total} 已完成` : "";
-  }else if(view==="month" && monthMode==="overview"){
-    titleEl.textContent="本月概览";
-    subtitleEl.textContent="这个月在推进哪些事、铺在哪几天";
-    countEl.textContent="";
   }else{
     titleEl.textContent=VIEW_TITLE[view];
     subtitleEl.textContent={week:"这周要推进点什么",month:"这个月准备达成什么",year:"今年最重要的目标"}[view]||"";
