@@ -1152,8 +1152,10 @@ function fillList(container, tasks, ownerView, emptyText){
   sorted.forEach(t=>container.appendChild(renderTask(t, tasks, ownerView)));
 }
 
-// 当前日期下、某清单里的任务（按日期轴过滤）
-function dayTasksOf(list){ return (list.tasks||[]).filter(t=>t.date===currentDate); }
+// 当前日期下、某清单里的任务（按"任务时间"过滤）
+// 任务归属哪天：优先看设定的时间 due（用户真正想做的日子），没有 due 才回退到 date（添加时所在的日子）
+function taskDay(t){ return t.due ? dateStr(new Date(t.due)) : (t.date||""); }
+function dayTasksOf(list){ return (list.tasks||[]).filter(t=>taskDay(t)===currentDate); }
 function renderDay(){
   trackEl.innerHTML="";
   const isToday = currentDate===todayStr();
@@ -1825,7 +1827,7 @@ dateLabelEl.onclick=()=>openCalendar();
 let calCursor = currentDate;   // 月历当前显示的月份（取该月任意一天）
 // 统计某天各清单里有多少任务，用于日历圆点
 function dayHasTasks(str){
-  return state.day.lists.some(l => (l.tasks||[]).some(t => t.date===str));
+  return state.day.lists.some(l => (l.tasks||[]).some(t => taskDay(t)===str));
 }
 function renderCalendar(){
   const cur=new Date(calCursor+"T00:00:00");
