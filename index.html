@@ -111,7 +111,8 @@
   .task-chev{flex:0 0 auto;width:16px;text-align:center;color:var(--sub);cursor:pointer;
     font-size:10px;transition:transform .2s;user-select:none;}
   .task-chev.open{transform:rotate(90deg);}
-  .task-text{font-size:15px;line-height:1.3;word-break:break-word;transition:.15s;font-weight:500;}
+  .task-text{font-size:15px;line-height:1.3;word-break:break-word;transition:.15s;font-weight:500;cursor:pointer;}
+  .task-text:active{opacity:.6;}
   .task.done .task-text{color:var(--done);text-decoration:line-through;font-weight:400;}
   /* 节点：折叠箭头 + 进度 */
   .caret{flex:0 0 auto;width:16px;margin-top:3px;text-align:center;color:var(--sub);
@@ -581,11 +582,10 @@
     </div>
     <div class="parent-hint" id="parentHint"></div>
     <div class="input-row">
-      <input id="taskInput" class="main-input" type="text" placeholder="添加任务，回车提交…" autocomplete="off" />
+      <input id="taskInput" class="main-input" type="text" placeholder="添加任务，回车提交…" autocomplete="off" enterkeyhint="done" />
       <button class="icon-btn" id="habitBtn" title="添加习惯（按次数打卡）"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/><path d="M3 12a9 9 0 1 0 3-6.7"/></svg></button>
       <button class="icon-btn" id="parentBtn" title="挂到上级目标"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v7a4 4 0 0 0 4 4h8"/><path d="M14 11l4 4-4 4"/></svg></button>
       <button class="icon-btn" id="timeBtn" title="设置时间"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></button>
-      <button class="submit" id="submitBtn">＋</button>
     </div>
   </div>
 
@@ -810,6 +810,8 @@ let ovMode = { week:"list", month:"list", year:"list" }; // 周/月/年：list �
 let chartMode = "pie"; // 专注分布图：pie 扇形 | bar 条形
 let mvMonth = todayStr().slice(0,7);   // 月度概览当前查看的月份 YYYY-MM
 let pendingParentId = null;   // 新任务待挂靠的上级目标 id
+let parentPickTask = null;    // 挂靠弹层作用于已存在任务时的目标（null=作用于 composer 新任务）
+let parentPickView = null;    // 该任务所属层级，决定可选的上级层级
 
 /* ---------- 日期工具 ---------- */
 function pad2(n){ return String(n).padStart(2,"0"); }
@@ -1073,7 +1075,7 @@ const titleEl=document.getElementById("listTitle");
 const subtitleEl=document.getElementById("subtitle");
 const countEl=document.getElementById("countLabel");
 const inputEl=document.getElementById("taskInput");
-const submitEl=document.getElementById("submitBtn");
+const submitEl=document.getElementById("submitBtn");   // 已移除蓝色＋按钮，回车即添加；保留判空引用
 const timeBtn=document.getElementById("timeBtn");
 const pickerRow=document.getElementById("pickerRow");
 const timeField=document.getElementById("timeField");
@@ -1203,7 +1205,7 @@ function renderTask(task, listRef, ownerView){
     else check.style.background = `conic-gradient(var(--accent) ${pctRatio*360}deg, #e3e5e8 0deg)`;
     check.onclick=(e)=>{ e.stopPropagation(); expanded[task.id]=!expanded[task.id]; rerender(); };
   }else{
-    check.onclick=()=>{ task.done=!task.done; task.doneAt = task.done? Date.now() : null; save(); rerender(); };
+    check.onclick=(e)=>{ e.stopPropagation(); task.done=!task.done; task.doneAt = task.done? Date.now() : null; save(); rerender(); };
   }
   el.appendChild(check);
 
@@ -1214,6 +1216,8 @@ function renderTask(task, listRef, ownerView){
   head.className="task-head";
   const txt=document.createElement("div");
   txt.className="task-text"; txt.textContent=task.text;
+  txt.title="点击可重命名 / 改时间 / 挂靠 / 拆解";
+  txt.onclick=(e)=>{ e.stopPropagation(); openTaskMenu(task, ownerView, listRef); };
   // 日程视图：时间作为前缀放在任务文字最前（24h 时刻，无 emoji、无"今天"）
   if(ownerView==="day" && task.due){
     const tp=document.createElement("span");
@@ -1267,7 +1271,9 @@ function renderTask(task, listRef, ownerView){
   if(nextV){
     const b=document.createElement("span");
     b.className="chip break";
-    b.textContent="＋ 拆解到"+VIEW_TITLE[nextV];
+    // 支持跨级拆解：年→月/周/日、月→周/日、周→日。点一下弹层选目标层级
+    const lowerAll=lowerViewsOf(ownerView);
+    b.textContent = lowerAll.length>1 ? "＋ 拆解" : "＋ 拆解到"+VIEW_TITLE[nextV];
     b.onclick=(e)=>{ e.stopPropagation(); breakdown(task, ownerView); };
     tags.appendChild(b);
   }
@@ -1922,19 +1928,69 @@ function fmtTimeOnly(iso){
 
 /* ---------- 视图层级 & 拆解 ---------- */
 function nextViewFor(v){ return {year:"month",month:"week",week:"day"}[v]||null; }
-function breakdown(task, ownerView){
-  const nv=nextViewFor(ownerView); if(!nv) return;
-  dlgPrompt(`拆解为一条${VIEW_TITLE[nv]}任务`,{msg:`把「${task.text}」向下拆解`,placeholder:`这条${VIEW_TITLE[nv]}任务是…`}).then(raw=>{
+// 严格低于当前层的所有层级（用于跨级拆解）：年→[月,周,日]，月→[周,日]，周→[日]
+function lowerViewsOf(v){ return {year:["month","week","day"],month:["week","day"],week:["day"]}[v]||[]; }
+// 把 task 拆解为目标层 targetV 的一条子任务（可跨级）
+function breakdownTo(task, targetV){
+  dlgPrompt(`拆解为一条${VIEW_TITLE[targetV]}任务`,{msg:`把「${task.text}」拆解到${VIEW_TITLE[targetV]}`,placeholder:`这条${VIEW_TITLE[targetV]}任务是…`}).then(raw=>{
     const text=(raw||"").trim();
     if(!text) return;
     const child={ id:uid(), text, done:false, createdAt:Date.now(), due:null, parentText:task.text, children:[], sessions:[] };
-    if(nv==="day"){ child.date=currentDate; state.day.lists[current].tasks.push(child); }
-    else{ state[nv].tasks.push(child); }
+    if(targetV==="day"){ child.date=currentDate; state.day.lists[current].tasks.push(child); }
+    else{ state[targetV].tasks.push(child); }
     if(!task.children) task.children=[];
     task.children.push(child.id);
     expanded[task.id]=true;   // 拆解后自动展开父节点，立即看到新子项
     save(); rerender();
   });
+}
+function breakdown(task, ownerView){
+  const lowers=lowerViewsOf(ownerView);
+  if(!lowers.length) return;
+  if(lowers.length===1){ breakdownTo(task, lowers[0]); return; }
+  // 多个可选层级 → 弹层让用户选拆到哪一层（含跨级）
+  _openDialog({
+    title:`把「${task.text}」拆解到…`,
+    buttons:[
+      ...lowers.map(v=>({label:VIEW_TITLE[v],style:"ghost",value:v})),
+      {label:"取消",style:"ghost",value:null},
+    ],
+  }).then(v=>{ if(v) breakdownTo(task, v); });
+}
+
+/* ---------- 点击任务卡：重命名 / 改时间 / 挂靠 / 拆解 ---------- */
+async function openTaskMenu(task, ownerView, listRef){
+  const canParent = (PARENT_GROUPS[ownerView]||[]).length>0;
+  const canBreak = lowerViewsOf(ownerView).length>0;
+  const buttons=[
+    {label:"重命名",style:"ghost",value:"rename"},
+    {label: task.due? "修改时间":"设置时间", style:"ghost", value:"time"},
+  ];
+  if(canParent) buttons.push({label: task.parentText? "重新挂靠上级":"挂靠到上级目标", style:"ghost", value:"parent"});
+  if(canBreak)  buttons.push({label:"拆解到下级", style:"ghost", value:"break"});
+  buttons.push({label:"取消",style:"ghost",value:null});
+  const act=await _openDialog({ title:`「${task.text}」`, buttons });
+  if(act==="rename"){
+    const name=(await dlgPrompt("重命名任务",{value:task.text,placeholder:"任务名称"})||"").trim();
+    if(name && name!==task.text){
+      // 同步所有把它当上级的子任务的 parentText 展示文案
+      const oldText=task.text; task.text=name;
+      allTasks().forEach(t=>{ if(t.parentText===oldText) t.parentText=name; });
+      save(); rerender();
+    }
+  }else if(act==="time"){
+    editTaskDue(task);
+  }else if(act==="parent"){
+    openParentPicker(task, ownerView);
+  }else if(act==="break"){
+    breakdown(task, ownerView);
+  }
+}
+// 给已存在的任务重新选/改挂靠上级（复用挂靠弹层，但作用于具体 task 而非 composer 的 pending）
+function openParentPicker(task, ownerView){
+  parentPickTask=task; parentPickView=ownerView;
+  renderParentSheet();
+  parentMaskEl.classList.add("show");
 }
 
 /* ---------- 添加 ---------- */
@@ -2009,12 +2065,17 @@ const PARENT_GROUPS={
   year:[]
 };
 // 挂靠上级：底部弹层，按层级分组竖排，点一项即选中
+// 两种模式：composer 新任务（parentPickTask=null，选中记到 pendingParentId）；
+//          已存在任务（parentPickTask 有值，点一下立即改挂并保存）
 function renderParentSheet(){
   parentBodyEl.innerHTML="";
-  const groups=PARENT_GROUPS[view]||[];
+  const editing=parentPickTask;
+  const layer=editing? parentPickView : view;
+  const groups=PARENT_GROUPS[layer]||[];
+  const curParentId=editing? parentIdOf(editing) : pendingParentId;
   let any=false;
   groups.forEach(([v,label])=>{
-    const tasks=state[v].tasks;
+    const tasks=(state[v].tasks||[]).filter(t=> !editing || t.id!==editing.id);
     if(!tasks.length) return;
     any=true;
     const lb=document.createElement("div");
@@ -2022,20 +2083,40 @@ function renderParentSheet(){
     parentBodyEl.appendChild(lb);
     tasks.forEach(t=>{
       const opt=document.createElement("div");
-      const on=pendingParentId===t.id;
+      const on=curParentId===t.id;
       opt.className="ph-opt"+(on?" sel":"");
       opt.innerHTML=`<span class="radio"></span><span class="txt">${escapeHtml(t.text)}</span>`;
-      opt.onclick=()=>{ pendingParentId = on? null : t.id; renderParentSheet(); };
+      opt.onclick=()=>{
+        if(editing){
+          on? unlinkParent(editing) : linkParent(editing, t);
+          save(); closeParentSheet(); rerender();
+        }else{
+          pendingParentId = on? null : t.id; renderParentSheet();
+        }
+      };
       parentBodyEl.appendChild(opt);
     });
   });
   if(!any){
-    const tip={day:"先去「周/月/年」写下目标",week:"先去「月/年」写下目标",month:"先去「年度目标」写下目标"}[view]||"先写下更高层的目标";
+    const tip={day:"先去「周/月/年」写下目标",week:"先去「月/年」写下目标",month:"先去「年度目标」写下目标"}[layer]||"先写下更高层的目标";
     parentBodyEl.innerHTML=`<div class="ph-empty">还没有上级目标<br>${tip}，<br>就能把它挂上去了</div>`;
   }
 }
-function openParentSheet(){ renderParentSheet(); parentMaskEl.classList.add("show"); }
-function closeParentSheet(){ parentMaskEl.classList.remove("show"); syncParentHint(); }
+// 找到某任务当前挂靠的父目标 id（通过 children 反查）
+function parentIdOf(task){ const p=allTasks().find(t=>t.children&&t.children.includes(task.id)); return p?p.id:null; }
+// 把已存在任务挂到某上级：先从旧父摘除，再挂到新父
+function linkParent(task, parent){
+  unlinkParent(task);
+  task.parentText=parent.text;
+  if(!parent.children) parent.children=[];
+  if(!parent.children.includes(task.id)) parent.children.push(task.id);
+}
+function unlinkParent(task){
+  allTasks().forEach(t=>{ if(t.children) t.children=t.children.filter(id=>id!==task.id); });
+  task.parentText=null;
+}
+function openParentSheet(){ parentPickTask=null; parentPickView=null; renderParentSheet(); parentMaskEl.classList.add("show"); }
+function closeParentSheet(){ parentMaskEl.classList.remove("show"); parentPickTask=null; parentPickView=null; syncParentHint(); }
 // 输入框上方的"已挂靠"提示条
 function syncParentHint(){
   const p = pendingParentId? taskById(pendingParentId) : null;
@@ -2055,7 +2136,7 @@ parentCloseEl.onclick=closeParentSheet;
 parentConfirmEl.onclick=closeParentSheet;
 parentMaskEl.onclick=(e)=>{ if(e.target===parentMaskEl) closeParentSheet(); };
 
-submitEl.onclick=addTask;
+if(submitEl) submitEl.onclick=addTask;
 inputEl.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); });
 
 /* ---------- 新建 / 编辑习惯 ---------- */
