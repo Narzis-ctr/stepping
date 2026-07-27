@@ -147,6 +147,45 @@
   .focus-btn:active{transform:translateY(-50%) scale(.9);background:var(--accent);color:#fff;}
   /* 有专注按钮的卡片：右侧留出圆钮空间，文字不与之重叠 */
   .task.has-focus{padding-right:60px;}
+  /* ---- 习惯卡片：按次数打卡，日程置顶一条打卡行；周/月/年显示比例 ---- */
+  .habit-section{margin:2px 0 4px;}
+  .habit-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--sub);
+    margin:8px 2px 2px;letter-spacing:.5px;}
+  .habit{
+    display:flex;align-items:center;gap:11px;background:var(--card);
+    border-radius:14px;padding:9px 12px 9px 15px;margin-top:7px;box-shadow:var(--shadow);
+    transition:.15s;position:relative;border-left:3px solid var(--accent-soft);
+  }
+  .habit.reached{border-left-color:#34c759;}
+  .habit-body{flex:1 1 auto;min-width:0;}
+  .habit-text{font-size:15px;line-height:1.3;font-weight:500;word-break:break-word;}
+  .habit.reached .habit-text{color:var(--done);}
+  .habit-sub{font-size:11.5px;color:var(--sub);margin-top:2px;display:flex;align-items:center;gap:6px;}
+  .habit-sub .cnt{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .habit.reached .habit-sub .cnt{color:#34c759;}
+  /* 打卡区：perDay===1 单个圆钮；perDay>1 用 − N/M ＋ 步进 */
+  .habit-tick{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:2px solid var(--done);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:#fff;}
+  .habit-tick svg{width:14px;height:14px;opacity:0;transition:.15s;}
+  .habit-tick.on{background:var(--accent);border-color:var(--accent);}
+  .habit-tick.on svg{opacity:1;}
+  .habit-tick.reached{background:#34c759;border-color:#34c759;}
+  .habit-tick:active{transform:scale(.9);}
+  .habit-step{flex:0 0 auto;display:flex;align-items:center;gap:8px;}
+  .habit-step .sbtn{width:28px;height:28px;border-radius:50%;background:var(--bg);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;line-height:1;user-select:none;transition:.12s;}
+  .habit-step .sbtn.plus{background:var(--accent);color:#fff;box-shadow:0 3px 10px rgba(91,157,240,.35);}
+  .habit-step .sbtn.reached{background:#34c759;box-shadow:0 3px 10px rgba(52,199,89,.35);}
+  .habit-step .sbtn:active{transform:scale(.88);}
+  .habit-step .sbtn.dim{opacity:.35;pointer-events:none;}
+  .habit-step .num{font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;min-width:34px;text-align:center;}
+  .habit .del{top:5px;right:7px;}
+  /* 周/月/年清单里的习惯行：显示区间比例，可原地打卡 */
+  .habit-ratio{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .habit.reached .habit-ratio{color:#34c759;}
+  .habit-bar{height:5px;border-radius:3px;background:#eef0f2;overflow:hidden;margin-top:6px;}
+  .habit-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .35s ease;}
+  .habit.reached .habit-bar-fill{background:#34c759;}
   .del{position:absolute;top:7px;right:9px;color:var(--sub);font-size:14px;line-height:1;
     padding:3px;cursor:pointer;opacity:.28;}
   .del:active{opacity:1;color:var(--danger);}
@@ -425,6 +464,33 @@
   }
   /* 应用内日期时间选择器 */
   .cal-month-label{text-align:center;font-size:15px;font-weight:600;color:var(--ink);margin:-4px 0 10px;}
+  /* ---- 新建/编辑习惯弹层 ---- */
+  .hb-body{max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .hb-field{margin-bottom:14px;}
+  .hb-field>label{display:block;font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:7px;letter-spacing:.3px;}
+  .hb-input{width:100%;border:none;background:var(--bg);border-radius:14px;padding:12px 14px;
+    font-size:16px;color:var(--ink);outline:none;box-sizing:border-box;}
+  .hb-seg{display:flex;gap:6px;flex-wrap:wrap;}
+  .hb-seg .seg{flex:1 1 auto;text-align:center;font-size:13px;padding:9px 6px;border-radius:12px;
+    background:var(--bg);color:var(--sub);cursor:pointer;user-select:none;transition:.12s;white-space:nowrap;}
+  .hb-seg .seg.on{background:var(--accent);color:#fff;font-weight:600;}
+  .hb-stepper{display:flex;align-items:center;gap:16px;}
+  .hb-stepper .st{width:36px;height:36px;border-radius:50%;background:var(--bg);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;user-select:none;transition:.12s;}
+  .hb-stepper .st:active{transform:scale(.88);background:var(--accent-soft);}
+  .hb-stepper .stv{font-size:18px;font-weight:700;min-width:40px;text-align:center;font-variant-numeric:tabular-nums;}
+  .hb-days{display:flex;gap:6px;}
+  .hb-days .d{flex:1 1 0;text-align:center;padding:10px 0;border-radius:12px;background:var(--bg);
+    color:var(--sub);font-size:14px;cursor:pointer;user-select:none;transition:.12s;}
+  .hb-days .d.on{background:var(--accent);color:#fff;font-weight:600;}
+  .hb-targets{display:flex;gap:8px;}
+  .hb-tg{flex:1 1 0;background:var(--bg);border-radius:12px;padding:8px 10px;}
+  .hb-tg span{display:block;font-size:11px;color:var(--sub);margin-bottom:4px;}
+  .hb-tg input{width:100%;border:none;background:transparent;font-size:15px;color:var(--ink);outline:none;
+    font-variant-numeric:tabular-nums;box-sizing:border-box;}
+  .hb-hint{font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.6;}
+  .hb-del{background:transparent;color:var(--danger);}
+  .hidden{display:none !important;}
   .dt-time{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;}
   .dt-time-label{font-size:13px;color:var(--sub);margin-bottom:8px;}
   .dt-time-rows{display:flex;align-items:center;gap:8px;justify-content:center;}
@@ -516,6 +582,7 @@
     <div class="parent-hint" id="parentHint"></div>
     <div class="input-row">
       <input id="taskInput" class="main-input" type="text" placeholder="添加任务，回车提交…" autocomplete="off" />
+      <button class="icon-btn" id="habitBtn" title="添加习惯（按次数打卡）"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/><path d="M3 12a9 9 0 1 0 3-6.7"/></svg></button>
       <button class="icon-btn" id="parentBtn" title="挂到上级目标"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v7a4 4 0 0 0 4 4h8"/><path d="M14 11l4 4-4 4"/></svg></button>
       <button class="icon-btn" id="timeBtn" title="设置时间"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></button>
       <button class="submit" id="submitBtn">＋</button>
@@ -534,8 +601,59 @@
     </div>
   </div>
 
-  <!-- 月度概览：手动校准某个目标的起止日期 -->
-  <div class="cal-mask" id="mvEditMask">
+  <!-- 月度概览：手动校准某个目标的起止日期 --><div class="cal-mask" id="habitMask">
+    <div class="cal-sheet">
+      <div class="cal-head">
+        <div class="cal-title" id="habitTitle">新建习惯</div>
+        <div class="ph-close" id="habitClose">✕</div>
+      </div>
+      <div class="hb-body">
+        <div class="hb-field">
+          <label>习惯名称</label>
+          <input class="hb-input" id="hbText" type="text" placeholder="如 喝水 / 冥想 / 早睡" autocomplete="off" />
+        </div>
+        <div class="hb-field">
+          <label>频次</label>
+          <div class="hb-seg" id="hbFreqSeg">
+            <div class="seg on" data-freq="daily">每天</div>
+            <div class="seg" data-freq="weekN">每周N次</div>
+            <div class="seg" data-freq="monthN">每月N次</div>
+            <div class="seg" data-freq="days">指定星期几</div>
+          </div>
+        </div>
+        <div class="hb-field" id="hbPerDayWrap">
+          <label>每天几次</label>
+          <div class="hb-stepper"><div class="st" id="hbPerMinus">−</div><div class="stv" id="hbPerVal">1</div><div class="st" id="hbPerPlus">＋</div></div>
+        </div>
+        <div class="hb-field hidden" id="hbNWrap">
+          <label id="hbNLabel">每周几次</label>
+          <div class="hb-stepper"><div class="st" id="hbNMinus">−</div><div class="stv" id="hbNVal">3</div><div class="st" id="hbNPlus">＋</div></div>
+        </div>
+        <div class="hb-field hidden" id="hbDaysWrap">
+          <label>选择星期几</label>
+          <div class="hb-days" id="hbDays">
+            <div class="d" data-d="1">一</div><div class="d" data-d="2">二</div><div class="d" data-d="3">三</div>
+            <div class="d" data-d="4">四</div><div class="d" data-d="5">五</div><div class="d" data-d="6">六</div><div class="d" data-d="0">日</div>
+          </div>
+        </div>
+        <div class="hb-field">
+          <label>目标（可留空，自动按频次估算）</label>
+          <div class="hb-targets">
+            <div class="hb-tg"><span>本周</span><input id="hbWeek" type="number" min="0" placeholder="自动" /></div>
+            <div class="hb-tg"><span>本月</span><input id="hbMonth" type="number" min="0" placeholder="自动" /></div>
+            <div class="hb-tg"><span>今年</span><input id="hbYear" type="number" min="0" placeholder="自动" /></div>
+          </div>
+          <div class="hb-hint" id="hbAutoHint"></div>
+        </div>
+      </div>
+      <div class="cal-foot" style="gap:10px;">
+        <div class="cal-today-btn hb-del hidden" id="habitDelete">删除</div>
+        <div class="cal-today-btn" id="habitSave">保存</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 月度概览：手动校准某个目标的起止日期 -->  <div class="cal-mask" id="mvEditMask">
     <div class="cal-sheet" id="mvEditSheet">
       <div class="cal-head">
         <div class="cal-title" id="mvEditTitle">校准时间</div>
@@ -724,7 +842,8 @@ function fmtDateNav(str){
 function blank(){
   return {
     day:{ lists:[ {name:"今天",tasks:[]}, {name:"工作",tasks:[]}, {name:"生活",tasks:[]} ] },
-    week:{ tasks:[] }, month:{ tasks:[] }, year:{ tasks:[] }
+    week:{ tasks:[] }, month:{ tasks:[] }, year:{ tasks:[] },
+    habits:[]   // 习惯：跨天/周/月/年只算次数的任务，打卡自动上卷到各层
   };
 }
 
@@ -780,6 +899,18 @@ function seed(){
   const yWork = mk("上半年产出完整作品集，拿到心仪 offer", { children:[mWork.id] });
   s.year.tasks.push(yBook, yBody, yWork);
 
+  // —— 习惯：只按次数计的任务，打卡自动上卷到周/月/年 ——
+  const nowT = Date.now();
+  const dayMs = 86400000;
+  s.habits = [
+    // 每天 8 杯水：今天已打 3 杯
+    { id:"seed-h1", text:"喝水", perDay:8, freq:"daily", weekTarget:56, monthTarget:240, yearTarget:2920,
+      checkins:[nowT-3600000*2, nowT-3600000, nowT-600000] },
+    // 每天冥想：过去一周打了 4 天
+    { id:"seed-h2", text:"冥想 10 分钟", perDay:1, freq:"daily", weekTarget:7, monthTarget:30, yearTarget:365,
+      checkins:[nowT-dayMs*5, nowT-dayMs*3, nowT-dayMs*1, nowT-1800000] },
+  ];
+
   return s;
 }
 function load(){
@@ -800,6 +931,7 @@ function migrate(d){
     ["week","month","year"].forEach(v=>(d[v]&&d[v].tasks||[]).forEach(task=>{
       if(!task.sessions) task.sessions=[];
     }));
+    if(!Array.isArray(d.habits)) d.habits=[];   // 旧数据补空习惯数组，平滑升级
     // doneAt / manualSpan 为可选新字段，无需回填（缺省即"未记录/自动"）
   }catch(e){}
   return d;
@@ -857,6 +989,80 @@ function activeDatesOf(task){
   });
   if(task.doneAt) dates.add(dateStr(new Date(task.doneAt)));
   return dates;
+}
+
+/* ---------- 习惯：按次数计的任务，打卡自动上卷到日/周/月/年 ----------
+   habit = { id, text, perDay, freq, weekTarget, monthTarget, yearTarget, checkins:[时间戳...] }
+   freq: "daily"（每天）| "weekN"（每周N次）| "monthN"（每月N次）| "days:1,3,5"（指定星期几，0=周日）*/
+function habitById(id){ return (state.habits||[]).find(h=>h.id===id) || null; }
+// 一周的起止（周一为一周之始，与国内习惯一致）
+function weekRange(dateStr_){
+  const d=new Date(dateStr_+"T00:00:00");
+  const dow=(d.getDay()+6)%7;          // 周一=0 … 周日=6
+  const start=new Date(d); start.setDate(d.getDate()-dow); start.setHours(0,0,0,0);
+  const end=new Date(start); end.setDate(start.getDate()+7);
+  return { start:start.getTime(), end:end.getTime() };
+}
+function monthRange(ym){                // ym: YYYY-MM
+  const [y,m]=ym.split("-").map(Number);
+  return { start:new Date(y,m-1,1).getTime(), end:new Date(y,m,1).getTime() };
+}
+function yearRange(year){
+  return { start:new Date(year,0,1).getTime(), end:new Date(year+1,0,1).getTime() };
+}
+// 统计 checkins 落在 [start,end) 内的次数
+function countIn(habit, start, end){
+  return (habit.checkins||[]).filter(ts=>ts>=start && ts<end).length;
+}
+function habitDayCount(habit, dateStr_){
+  const s=new Date(dateStr_+"T00:00:00").getTime();
+  return countIn(habit, s, s+86400000);
+}
+function habitTodayCount(habit){ return habitDayCount(habit, currentDate); }
+// 打卡 / 撤销一次（针对某天，默认今天用"现在"，历史日用当天中午的时间戳）
+function habitCheck(habit, dateStr_){
+  const day = dateStr_ || currentDate;
+  const ts = day===todayStr() ? Date.now() : new Date(day+"T12:00:00").getTime();
+  (habit.checkins ||= []).push(ts);
+  save();
+}
+function habitUncheck(habit, dateStr_){
+  const day = dateStr_ || currentDate;
+  const s=new Date(day+"T00:00:00").getTime(), e=s+86400000;
+  const arr=habit.checkins||[];
+  // 撤销当天最后一次打卡
+  for(let i=arr.length-1;i>=0;i--){ if(arr[i]>=s && arr[i]<e){ arr.splice(i,1); break; } }
+  save();
+}
+// 某范围内的进度：{done,total,ratio,reached}
+function habitRangeProgress(habit, kind){
+  let count, target;
+  if(kind==="week"){ const r=weekRange(currentDate); count=countIn(habit,r.start,r.end); target=habit.weekTarget||habitAutoWeek(habit); }
+  else if(kind==="month"){ const ym=(mvMonth||todayStr().slice(0,7)); const r=monthRange(ym); count=countIn(habit,r.start,r.end); target=habit.monthTarget||habitAutoMonth(habit); }
+  else if(kind==="year"){ const y=new Date(currentDate+"T00:00:00").getFullYear(); const r=yearRange(y); count=countIn(habit,r.start,r.end); target=habit.yearTarget||habitAutoYear(habit); }
+  else { count=habitTodayCount(habit); target=habit.perDay||1; }   // day
+  target=Math.max(1,target);
+  return { done:count, total:target, ratio:Math.min(1,count/target), reached:count>=target };
+}
+// 频次 → 各层默认目标（用户没填时兜底）
+function habitPerWeekTimes(habit){
+  if(habit.freq==="daily") return 7*(habit.perDay||1);
+  const wm=/^week(\d+)$/.exec(habit.freq||""); if(wm) return Number(wm[1]);
+  const mm=/^month(\d+)$/.exec(habit.freq||""); if(mm) return Number(mm[1])/4.345;
+  const dm=/^days:(.+)$/.exec(habit.freq||""); if(dm) return dm[1].split(",").filter(x=>x!=="").length*(habit.perDay||1);
+  return 7;
+}
+function habitAutoWeek(habit){ return Math.round(habitPerWeekTimes(habit)); }
+function habitAutoMonth(habit){ return Math.round(habitPerWeekTimes(habit)*4.345); }
+function habitAutoYear(habit){ return Math.round(habitPerWeekTimes(habit)*52.14); }
+// 频次友好文字
+function habitFreqLabel(habit){
+  if(habit.freq==="daily") return habit.perDay>1 ? `每天 ${habit.perDay} 次` : "每天";
+  const wm=/^week(\d+)$/.exec(habit.freq||""); if(wm) return `每周 ${wm[1]} 次`;
+  const mm=/^month(\d+)$/.exec(habit.freq||""); if(mm) return `每月 ${mm[1]} 次`;
+  const dm=/^days:(.+)$/.exec(habit.freq||"");
+  if(dm){ const names=["日","一","二","三","四","五","六"]; return "每周 "+dm[1].split(",").filter(x=>x!=="").map(i=>"周"+names[Number(i)]).join(" "); }
+  return "习惯";
 }
 
 /* ---------- DOM ---------- */
@@ -1156,16 +1362,92 @@ function fillList(container, tasks, ownerView, emptyText){
 // 任务归属哪天：优先看设定的时间 due（用户真正想做的日子），没有 due 才回退到 date（添加时所在的日子）
 function taskDay(t){ return t.due ? dateStr(new Date(t.due)) : (t.date||""); }
 function dayTasksOf(list){ return (list.tasks||[]).filter(t=>taskDay(t)===currentDate); }
+
+/* ---------- 习惯卡片渲染 ---------- */
+// 这个习惯今天是否"该做"：daily/次数型每天都可打；指定星期几只在对应日出现
+function habitDueOn(habit, dateStr_){
+  const dm=/^days:(.+)$/.exec(habit.freq||"");
+  if(dm){ const set=dm[1].split(",").filter(x=>x!==""); return set.includes(String(new Date(dateStr_+"T00:00:00").getDay())); }
+  return true;   // daily / weekN / monthN 每天都能打卡
+}
+// 日程视图：一条习惯打卡行（perDay===1 圆钮；perDay>1 步进）
+function renderHabitDayRow(habit){
+  const done=habitTodayCount(habit), per=habit.perDay||1;
+  const reached=done>=per;
+  const row=document.createElement("div");
+  row.className="habit"+(reached?" reached":"");
+
+  const body=document.createElement("div"); body.className="habit-body";
+  const txt=document.createElement("div"); txt.className="habit-text"; txt.textContent=habit.text;
+  body.appendChild(txt);
+  const sub=document.createElement("div"); sub.className="habit-sub";
+  sub.innerHTML=`<span>${habitFreqLabel(habit)}</span>`+(per>1?`<span class="cnt">${done}/${per}</span>`:(reached?`<span class="cnt">今天已完成 ✓</span>`:""));
+  body.appendChild(sub);
+  row.appendChild(body);
+
+  if(per>1){
+    const step=document.createElement("div"); step.className="habit-step";
+    const minus=document.createElement("div"); minus.className="sbtn"+(done<=0?" dim":"");
+    minus.textContent="−"; minus.onclick=(e)=>{ e.stopPropagation(); habitUncheck(habit); rerender(); };
+    const num=document.createElement("div"); num.className="num"; num.textContent=`${done}/${per}`;
+    const plus=document.createElement("div"); plus.className="sbtn plus"+(reached?" reached":"");
+    plus.textContent="＋"; plus.onclick=(e)=>{ e.stopPropagation(); habitCheck(habit); rerender(); };
+    step.appendChild(minus); step.appendChild(num); step.appendChild(plus);
+    row.appendChild(step);
+  }else{
+    const tick=document.createElement("div"); tick.className="habit-tick"+(reached?" on reached":"");
+    tick.innerHTML=CHECK_SVG;
+    tick.onclick=(e)=>{ e.stopPropagation(); reached? habitUncheck(habit) : habitCheck(habit); rerender(); };
+    row.appendChild(tick);
+  }
+
+  const del=document.createElement("div"); del.className="del"; del.textContent="×";
+  del.onclick=(e)=>{ e.stopPropagation(); editHabit(habit); };
+  row.appendChild(del);
+  return row;
+}
+// 周/月/年清单：一条习惯比例行（本周 4/7、本月 21/30、今年 240/365，点右侧可原地为今天打卡）
+function renderHabitRangeRow(habit, kind){
+  const p=habitRangeProgress(habit, kind);
+  const label={week:"本周",month:"本月",year:"今年"}[kind]||"";
+  const row=document.createElement("div");
+  row.className="habit"+(p.reached?" reached":"");
+  const body=document.createElement("div"); body.className="habit-body";
+  body.innerHTML=`<div class="habit-text">${escapeHtml(habit.text)}</div>
+    <div class="habit-sub"><span>${habitFreqLabel(habit)}</span></div>
+    <div class="habit-bar"><div class="habit-bar-fill" style="width:${Math.round(p.ratio*100)}%"></div></div>`;
+  row.appendChild(body);
+  const ratio=document.createElement("div"); ratio.className="habit-ratio";
+  ratio.textContent=`${label} ${p.done}/${p.total}`+(p.reached?" ✓":"");
+  row.appendChild(ratio);
+  const del=document.createElement("div"); del.className="del"; del.textContent="×";
+  del.onclick=(e)=>{ e.stopPropagation(); editHabit(habit); };
+  row.appendChild(del);
+  return row;
+}
+// 把习惯区块插到容器最前（日程用 day 行，周/月/年用比例行）
+function prependHabits(container, kind){
+  const habits=(state.habits||[]).filter(h=> kind!=="day" || habitDueOn(h,currentDate));
+  if(!habits.length) return;
+  const sec=document.createElement("div"); sec.className="habit-section";
+  const lb=document.createElement("div"); lb.className="habit-label";
+  lb.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 习惯打卡`;
+  sec.appendChild(lb);
+  habits.forEach(h=> sec.appendChild(kind==="day"? renderHabitDayRow(h) : renderHabitRangeRow(h,kind)));
+  container.insertBefore(sec, container.firstChild);
+}
 function renderDay(){
   trackEl.innerHTML="";
   const isToday = currentDate===todayStr();
   const empty = isToday
     ? "还没有任务<br>在下方添加第一件事吧"
     : "这一天还没有安排<br>在下方添加，或用上方箭头回到今天";
-  state.day.lists.forEach(list=>{
+  state.day.lists.forEach((list,i)=>{
     const page=document.createElement("div");
     page.className="page";
     fillList(page, dayTasksOf(list), "day", empty);
+    // 习惯打卡区只挂在第一个清单（今天）顶部，是跨清单的、不重复
+    if(i===0 && currentDate===todayStr()) prependHabits(page, "day");
     trackEl.appendChild(page);
   });
   layout();
@@ -1176,6 +1458,7 @@ function renderSingle(){
   const box=document.createElement("div");
   const emptyHint={week:"从年/月目标拆解，或直接添加",month:"从年度目标拆解，或直接添加",year:"写下今年最重要的目标"}[view]||"";
   fillList(box, state[view].tasks, view, "还没有内容<br>"+emptyHint);
+  prependHabits(box, view);   // 周/月/年清单顶部显示习惯的区间比例
   singleEl.appendChild(box);
 }
 
@@ -1387,7 +1670,8 @@ function renderOverview(v){
   }
 
   const tasks=state[v].tasks||[];
-  if(!tasks.length){
+  const habits=state.habits||[];
+  if(!tasks.length && !habits.length){
     const e=document.createElement("div");
     e.className="mv-empty";
     const emptyMsg={week:"这周还没有目标",month:"这个月还没有目标",year:"今年还没有目标"}[v];
@@ -1395,6 +1679,14 @@ function renderOverview(v){
     wrap.appendChild(e);
     singleEl.appendChild(wrap);
     return;
+  }
+
+  // 习惯打卡：概览里只给比例数字（本周/本月/今年 X/Y）
+  if(habits.length){
+    const lb=document.createElement("div");
+    lb.className="mv-group-label"; lb.textContent=`习惯打卡（${habits.length}）`;
+    wrap.appendChild(lb);
+    habits.forEach(h=>wrap.appendChild(renderHabitRangeRow(h, v)));
   }
 
   // 按状态分组：进行中 / 已完成 / 未完成
@@ -1765,6 +2057,88 @@ parentMaskEl.onclick=(e)=>{ if(e.target===parentMaskEl) closeParentSheet(); };
 
 submitEl.onclick=addTask;
 inputEl.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); });
+
+/* ---------- 新建 / 编辑习惯 ---------- */
+const habitMaskEl=document.getElementById("habitMask");
+const hbTitleEl=document.getElementById("habitTitle");
+let hbEditing=null;        // 正在编辑的习惯（null=新建）
+let hbFreq="daily", hbPer=1, hbN=3, hbDaysSel=new Set();
+function hbSyncFields(){
+  document.querySelectorAll("#hbFreqSeg .seg").forEach(s=>s.classList.toggle("on", s.dataset.freq===hbFreq));
+  document.getElementById("hbPerDayWrap").classList.toggle("hidden", hbFreq!=="daily");
+  const nWrap=document.getElementById("hbNWrap");
+  nWrap.classList.toggle("hidden", !(hbFreq==="weekN"||hbFreq==="monthN"));
+  document.getElementById("hbNLabel").textContent = hbFreq==="weekN"?"每周几次":"每月几次";
+  document.getElementById("hbDaysWrap").classList.toggle("hidden", hbFreq!=="days");
+  document.getElementById("hbPerVal").textContent=hbPer;
+  document.getElementById("hbNVal").textContent=hbN;
+  document.querySelectorAll("#hbDays .d").forEach(d=>d.classList.toggle("on", hbDaysSel.has(d.dataset.d)));
+  // 自动目标提示
+  const probe=hbBuildFreq();
+  const tmp={freq:probe, perDay:hbPer};
+  document.getElementById("hbAutoHint").textContent=
+    `留空则自动：本周约 ${habitAutoWeek(tmp)} 次 · 本月约 ${habitAutoMonth(tmp)} 次 · 今年约 ${habitAutoYear(tmp)} 次`;
+}
+function hbBuildFreq(){
+  if(hbFreq==="daily") return "daily";
+  if(hbFreq==="weekN") return "week"+hbN;
+  if(hbFreq==="monthN") return "month"+hbN;
+  if(hbFreq==="days"){ const arr=[...hbDaysSel]; return "days:"+(arr.length?arr.join(","):"1"); }
+  return "daily";
+}
+function openHabitDialog(habit){
+  hbEditing=habit||null;
+  hbTitleEl.textContent=habit?"编辑习惯":"新建习惯";
+  document.getElementById("habitDelete").classList.toggle("hidden", !habit);
+  // 回填
+  document.getElementById("hbText").value=habit?habit.text:"";
+  hbPer=habit&&habit.perDay?habit.perDay:1; hbN=3; hbDaysSel=new Set();
+  const f=habit?habit.freq:"daily";
+  if(f==="daily") hbFreq="daily";
+  else if(/^week\d+$/.test(f)){ hbFreq="weekN"; hbN=Number(f.slice(4)); }
+  else if(/^month\d+$/.test(f)){ hbFreq="monthN"; hbN=Number(f.slice(5)); }
+  else if(/^days:/.test(f)){ hbFreq="days"; f.slice(5).split(",").filter(x=>x!=="").forEach(x=>hbDaysSel.add(x)); }
+  else hbFreq="daily";
+  document.getElementById("hbWeek").value = habit&&habit.weekTarget?habit.weekTarget:"";
+  document.getElementById("hbMonth").value = habit&&habit.monthTarget?habit.monthTarget:"";
+  document.getElementById("hbYear").value = habit&&habit.yearTarget?habit.yearTarget:"";
+  hbSyncFields();
+  habitMaskEl.classList.add("show");
+  setTimeout(()=>document.getElementById("hbText").focus(),80);
+}
+function closeHabitDialog(){ habitMaskEl.classList.remove("show"); }
+function editHabit(habit){ openHabitDialog(habit); }
+function saveHabit(){
+  const text=document.getElementById("hbText").value.trim();
+  if(!text){ document.getElementById("hbText").focus(); return; }
+  const freq=hbBuildFreq();
+  const numOrNull=id=>{ const v=parseInt(document.getElementById(id).value,10); return (Number.isFinite(v)&&v>0)?v:null; };
+  const per = freq==="daily"? hbPer : 1;
+  const data={ text, freq, perDay:per,
+    weekTarget:numOrNull("hbWeek"), monthTarget:numOrNull("hbMonth"), yearTarget:numOrNull("hbYear") };
+  if(hbEditing){ Object.assign(hbEditing, data); }
+  else{ (state.habits ||= []).push(Object.assign({ id:uid(), checkins:[] }, data)); }
+  save(); closeHabitDialog(); rerender();
+}
+function deleteHabit(){
+  if(!hbEditing) return;
+  dlgConfirm(`「${hbEditing.text}」的所有打卡记录会一并删除。`,{title:"删除这个习惯？",okLabel:"删除",danger:true}).then(ok=>{
+    if(!ok) return;
+    state.habits=(state.habits||[]).filter(h=>h!==hbEditing);
+    save(); closeHabitDialog(); rerender();
+  });
+}
+document.getElementById("habitBtn").onclick=()=>openHabitDialog(null);
+document.getElementById("habitClose").onclick=closeHabitDialog;
+document.getElementById("habitSave").onclick=saveHabit;
+document.getElementById("habitDelete").onclick=deleteHabit;
+habitMaskEl.onclick=(e)=>{ if(e.target===habitMaskEl) closeHabitDialog(); };
+document.querySelectorAll("#hbFreqSeg .seg").forEach(s=> s.onclick=()=>{ hbFreq=s.dataset.freq; hbSyncFields(); });
+document.getElementById("hbPerMinus").onclick=()=>{ hbPer=Math.max(1,hbPer-1); hbSyncFields(); };
+document.getElementById("hbPerPlus").onclick=()=>{ hbPer=Math.min(50,hbPer+1); hbSyncFields(); };
+document.getElementById("hbNMinus").onclick=()=>{ hbN=Math.max(1,hbN-1); hbSyncFields(); };
+document.getElementById("hbNPlus").onclick=()=>{ hbN=Math.min(hbFreq==="monthN"?31:7,hbN+1); hbSyncFields(); };
+document.querySelectorAll("#hbDays .d").forEach(d=> d.onclick=()=>{ const k=d.dataset.d; hbDaysSel.has(k)?hbDaysSel.delete(k):hbDaysSel.add(k); hbSyncFields(); });
 
 /* ---------- 日程内滑动切换清单 ---------- */
 function layout(){ trackEl.style.transform=`translateX(${-current*100}%)`; }
