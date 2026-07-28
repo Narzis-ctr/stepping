@@ -150,6 +150,9 @@
   .task.has-focus{padding-right:60px;}
   /* ---- 习惯卡片：按次数打卡，日程置顶一条打卡行；周/月/年显示比例 ---- */
   .habit-section{margin:2px 0 4px;}
+  .habit-section--divided{padding-bottom:10px;border-bottom:1px dashed var(--line);margin-bottom:2px;}
+  .task-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--sub);
+    margin:12px 2px 2px;letter-spacing:.5px;}
   .habit-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--sub);
     margin:8px 2px 2px;letter-spacing:.5px;}
   .habit{
@@ -951,6 +954,26 @@ function save(){
 }
 function uid(){ return Date.now()+"-"+Math.random().toString(36).slice(2,6); }
 
+/* ---------- 完成音效：短促悦耳的"叮"，用 WebAudio 现场合成，无需音频文件 ---------- */
+let _audioCtx=null;
+function playDing(){
+  try{
+    _audioCtx = _audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(_audioCtx.state==="suspended") _audioCtx.resume();
+    const ctx=_audioCtx, now=ctx.currentTime;
+    // 两个上行音（C6→E6），营造"完成"的轻快感
+    [ [1046.5,0], [1318.5,0.09] ].forEach(([freq,at])=>{
+      const osc=ctx.createOscillator(), g=ctx.createGain();
+      osc.type="sine"; osc.frequency.value=freq;
+      g.gain.setValueAtTime(0, now+at);
+      g.gain.linearRampToValueAtTime(0.18, now+at+0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+at+0.22);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(now+at); osc.stop(now+at+0.24);
+    });
+  }catch(e){/* 静默失败：音效非关键路径 */}
+}
+
 /* ---------- 全量任务索引：跨视图按 id 找任务 ---------- */
 let expanded = {};  // { taskId: true } 记住展开状态
 function allTasks(){
@@ -1205,7 +1228,7 @@ function renderTask(task, listRef, ownerView){
     else check.style.background = `conic-gradient(var(--accent) ${pctRatio*360}deg, #e3e5e8 0deg)`;
     check.onclick=(e)=>{ e.stopPropagation(); expanded[task.id]=!expanded[task.id]; rerender(); };
   }else{
-    check.onclick=(e)=>{ e.stopPropagation(); task.done=!task.done; task.doneAt = task.done? Date.now() : null; save(); rerender(); };
+    check.onclick=(e)=>{ e.stopPropagation(); task.done=!task.done; task.doneAt = task.done? Date.now() : null; if(task.done) playDing(); save(); rerender(); };
   }
   el.appendChild(check);
 
@@ -1397,13 +1420,13 @@ function renderHabitDayRow(habit){
     minus.textContent="−"; minus.onclick=(e)=>{ e.stopPropagation(); habitUncheck(habit); rerender(); };
     const num=document.createElement("div"); num.className="num"; num.textContent=`${done}/${per}`;
     const plus=document.createElement("div"); plus.className="sbtn plus"+(reached?" reached":"");
-    plus.textContent="＋"; plus.onclick=(e)=>{ e.stopPropagation(); habitCheck(habit); rerender(); };
+    plus.textContent="＋"; plus.onclick=(e)=>{ e.stopPropagation(); habitCheck(habit); if(done+1>=per) playDing(); rerender(); };
     step.appendChild(minus); step.appendChild(num); step.appendChild(plus);
     row.appendChild(step);
   }else{
     const tick=document.createElement("div"); tick.className="habit-tick"+(reached?" on reached":"");
     tick.innerHTML=CHECK_SVG;
-    tick.onclick=(e)=>{ e.stopPropagation(); reached? habitUncheck(habit) : habitCheck(habit); rerender(); };
+    tick.onclick=(e)=>{ e.stopPropagation(); if(reached){ habitUncheck(habit); }else{ habitCheck(habit); playDing(); } rerender(); };
     row.appendChild(tick);
   }
 
@@ -1440,6 +1463,16 @@ function prependHabits(container, kind){
   lb.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 习惯打卡`;
   sec.appendChild(lb);
   habits.forEach(h=> sec.appendChild(kind==="day"? renderHabitDayRow(h) : renderHabitRangeRow(h,kind)));
+  // 日程视图里习惯与任务分区：习惯区加下分隔线，并在任务列表上方补一个"任务"小标题
+  if(kind==="day"){
+    sec.classList.add("habit-section--divided");
+    const hasTasks = container.querySelector(".task") || container.querySelector(".empty");
+    if(hasTasks){
+      const tl=document.createElement("div"); tl.className="task-label";
+      tl.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg> 任务`;
+      container.insertBefore(tl, container.firstChild);
+    }
+  }
   container.insertBefore(sec, container.firstChild);
 }
 function renderDay(){
@@ -1931,6 +1964,7 @@ function nextViewFor(v){ return {year:"month",month:"week",week:"day"}[v]||null;
 // 严格低于当前层的所有层级（用于跨级拆解）：年→[月,周,日]，月→[周,日]，周→[日]
 function lowerViewsOf(v){ return {year:["month","week","day"],month:["week","day"],week:["day"]}[v]||[]; }
 // 把 task 拆解为目标层 targetV 的一条子任务（可跨级）
+// 拆到「日」时额外弹时间选择器（可跳过）；拆到周/月不强制时间
 function breakdownTo(task, targetV){
   dlgPrompt(`拆解为一条${VIEW_TITLE[targetV]}任务`,{msg:`把「${task.text}」拆解到${VIEW_TITLE[targetV]}`,placeholder:`这条${VIEW_TITLE[targetV]}任务是…`}).then(raw=>{
     const text=(raw||"").trim();
@@ -1942,6 +1976,11 @@ function breakdownTo(task, targetV){
     task.children.push(child.id);
     expanded[task.id]=true;   // 拆解后自动展开父节点，立即看到新子项
     save(); rerender();
+    // 拆解后弹时间选择器，让用户顺手给新任务定时间（取消/清除都不影响任务已建成）
+    openDatePicker({ value:"", withTime:true, title:`给「${text}」设置时间（可跳过）` }).then(res=>{
+      if(res===undefined || res===null) return;   // 取消或清除：保持无时间
+      child.due=res; save(); rerender();
+    });
   });
 }
 function breakdown(task, ownerView){
@@ -1968,6 +2007,9 @@ async function openTaskMenu(task, ownerView, listRef){
   ];
   if(canParent) buttons.push({label: task.parentText? "重新挂靠上级":"挂靠到上级目标", style:"ghost", value:"parent"});
   if(canBreak)  buttons.push({label:"拆解到下级", style:"ghost", value:"break"});
+  // 换清单：仅日程视图、且有多个清单、且该任务是某清单的顶层任务时可用
+  const dayListIdx = (ownerView==="day") ? state.day.lists.findIndex(l=>l.tasks.includes(task)) : -1;
+  if(dayListIdx>=0 && state.day.lists.length>1) buttons.push({label:"移动到清单…", style:"ghost", value:"movelist"});
   buttons.push({label:"取消",style:"ghost",value:null});
   const act=await _openDialog({ title:`「${task.text}」`, buttons });
   if(act==="rename"){
@@ -1984,7 +2026,25 @@ async function openTaskMenu(task, ownerView, listRef){
     openParentPicker(task, ownerView);
   }else if(act==="break"){
     breakdown(task, ownerView);
+  }else if(act==="movelist"){
+    moveTaskToList(task, dayListIdx);
   }
+}
+// 把日程顶层任务从当前清单移动到另一个清单
+async function moveTaskToList(task, fromIdx){
+  const targets=state.day.lists
+    .map((l,i)=>({l,i}))
+    .filter(o=>o.i!==fromIdx)
+    .map(o=>({label:o.l.name||`清单${o.i+1}`, style:"ghost", value:o.i}));
+  targets.push({label:"取消",style:"ghost",value:null});
+  const to=await _openDialog({ title:"移动到哪个清单？", buttons:targets });
+  if(to===null || to===undefined) return;
+  const from=state.day.lists[fromIdx];
+  const pos=from.tasks.indexOf(task);
+  if(pos<0) return;
+  from.tasks.splice(pos,1);
+  state.day.lists[to].tasks.push(task);
+  save(); rerender();
 }
 // 给已存在的任务重新选/改挂靠上级（复用挂靠弹层，但作用于具体 task 而非 composer 的 pending）
 function openParentPicker(task, ownerView){
@@ -2542,6 +2602,19 @@ timerGiveupEl.onclick=()=>{
   });
 };
 timerMaskEl.onclick=(e)=>{ if(e.target===timerMaskEl) closeTimer(); };  // 点空白只收起，不丢弃计时
+
+// 离开软件（切后台/锁屏/切标签）时自动暂停，避免"人不在了还一直计时"
+// 回来时停在离开那一刻，用户手动点"继续"才接着走
+function pauseTimerIfRunning(){
+  if(timerState && !timerState.paused && timerState.startedAt){
+    timerState.accumBeforePauseSec=elapsedSec();
+    timerState.paused=true; timerState.startedAt=null;
+    persistTimer(); refreshTimerUI();
+  }
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) pauseTimerIfRunning(); });
+window.addEventListener("pagehide", pauseTimerIfRunning);
+window.addEventListener("blur", ()=>{ /* 切窗口也暂停；桌面误触发影响小 */ pauseTimerIfRunning(); });
 
 /* ---------- 启动 ---------- */
 switchView("day");
