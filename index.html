@@ -1463,15 +1463,14 @@ function prependHabits(container, kind){
   lb.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 习惯打卡`;
   sec.appendChild(lb);
   habits.forEach(h=> sec.appendChild(kind==="day"? renderHabitDayRow(h) : renderHabitRangeRow(h,kind)));
-  // 日程视图里习惯与任务分区：习惯区加下分隔线，并在任务列表上方补一个"任务"小标题
-  if(kind==="day"){
-    sec.classList.add("habit-section--divided");
-    const hasTasks = container.querySelector(".task") || container.querySelector(".empty");
-    if(hasTasks){
-      const tl=document.createElement("div"); tl.className="task-label";
-      tl.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg> 任务`;
-      container.insertBefore(tl, container.firstChild);
-    }
+  // 习惯与任务分区：习惯区加下分隔线，并在任务列表上方补一个"任务"小标题（日/周/月/年一致）
+  sec.classList.add("habit-section--divided");
+  const hasTasks = container.querySelector(".task") || container.querySelector(".empty");
+  if(hasTasks){
+    const tl=document.createElement("div"); tl.className="task-label";
+    const word = kind==="day" ? "任务" : (VIEW_TITLE[kind]||"")+"目标";
+    tl.innerHTML=`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg> ${word}`;
+    container.insertBefore(tl, container.firstChild);
   }
   container.insertBefore(sec, container.firstChild);
 }
@@ -2007,6 +2006,9 @@ async function openTaskMenu(task, ownerView, listRef){
   ];
   if(canParent) buttons.push({label: task.parentText? "重新挂靠上级":"挂靠到上级目标", style:"ghost", value:"parent"});
   if(canBreak)  buttons.push({label:"拆解到下级", style:"ghost", value:"break"});
+  // 补记专注：仅日程叶子任务，把没用计时器的专注时间手动补进去
+  const isLeaf = childrenOf(task).length===0;
+  if(ownerView==="day" && isLeaf) buttons.push({label:"补记一段专注", style:"ghost", value:"logfocus"});
   // 换清单：仅日程视图、且有多个清单、且该任务是某清单的顶层任务时可用
   const dayListIdx = (ownerView==="day") ? state.day.lists.findIndex(l=>l.tasks.includes(task)) : -1;
   if(dayListIdx>=0 && state.day.lists.length>1) buttons.push({label:"移动到清单…", style:"ghost", value:"movelist"});
@@ -2026,6 +2028,8 @@ async function openTaskMenu(task, ownerView, listRef){
     openParentPicker(task, ownerView);
   }else if(act==="break"){
     breakdown(task, ownerView);
+  }else if(act==="logfocus"){
+    addManualSession(task);
   }else if(act==="movelist"){
     moveTaskToList(task, dayListIdx);
   }
@@ -2592,6 +2596,24 @@ function finishTimer(auto){
   if(auto && navigator.vibrate) try{ navigator.vibrate(200); }catch(e){}
 }
 timerDoneEl.onclick=()=>finishTimer(false);
+
+// 补记一段专注：手动填写分钟数，直接写入 task.sessions（无需真的计时）
+async function addManualSession(task){
+  const raw=await dlgPrompt("补记专注时长",{msg:`给「${task.text}」补一段已经完成的专注`,placeholder:"分钟数，如 25",value:""});
+  if(raw===undefined || raw===null) return;
+  const min=Math.round(Number(String(raw).trim()));
+  if(!Number.isFinite(min) || min<=0){ dlgAlert("请输入一个正整数分钟数。"); return; }
+  if(min>1440){ dlgAlert("单段专注不超过 24 小时（1440 分钟）。"); return; }
+  // 落在当前查看日期的当下时刻，往前推 min 分钟作为开始
+  const now=new Date();
+  const [y,m,d]=currentDate.split("-").map(Number);
+  const end=new Date(y,m-1,d, now.getHours(), now.getMinutes(), now.getSeconds()).getTime();
+  const focusSec=min*60;
+  if(!task.sessions) task.sessions=[];
+  task.sessions.push({ start:end-focusSec*1000, end, focusSec, manual:true });
+  save(); rerender();
+}
+
 timerGiveupEl.onclick=()=>{
   if(!timerState) return closeTimer();
   const started=!!timerState.startedAt;
