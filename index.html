@@ -2545,7 +2545,8 @@ const dtClearEl=document.getElementById("dtClear");
 const dtOkEl=document.getElementById("dtOk");
 let _dtResolve=null, _dtCursor="", _dtSel="", _dtHour=9, _dtMin=0, _dtWithTime=false;
 const DT_ROW_H=44;               // 滚轮每行高度，须与 CSS .wc 一致
-let _dtSnapTimer=null;           // 滚动停止后的吸附节流
+let _dtSnapH=null, _dtSnapM=null; // 各自的吸附节流句柄
+let _dtLockH=0, _dtLockM=0;       // >0 时忽略滚动事件（正在程序化滚动/点击定位）
 
 function openDatePicker(opts={}){
   return new Promise(resolve=>{
@@ -2602,21 +2603,43 @@ function buildWheel(el, count, step, sel){
   for(let v=0; v<count; v+=step){
     const c=document.createElement("div");
     c.className="wc"+(v===sel?" sel":""); c.textContent=pad2(v); c.dataset.val=v;
-    c.onclick=()=>scrollWheelTo(el, v, step, true);
+    // 点击某个数字：直接锁定为该值并定位，不让滚动事件再改动它
+    c.onclick=()=>{
+      if(el===dtHoursEl){ _dtHour=v; } else { _dtMin=v; }
+      setWheelHighlight(el, v);
+      syncTimeInputs();
+      scrollWheelToLocked(el, v, step);
+    };
     el.appendChild(c);
   }
   const pad2b=document.createElement("div"); pad2b.className="wc pad"; pad2b.style.height="44px"; el.appendChild(pad2b);
 }
-// 把某个值滚到中央（smooth 用于点击/输入，瞬时用于初始化）
-function scrollWheelTo(el, val, step, smooth){
+// 程序化滚到某值并加锁：滚动期间产生的 scroll 事件被忽略，避免"点了又被吸附拽走"
+function scrollWheelToLocked(el, val, step){
   const idx=Math.round(val/step);
-  el.scrollTo({ top: idx*DT_ROW_H, behavior: smooth?"smooth":"auto" });
+  if(el===dtHoursEl) _dtLockH++; else _dtLockM++;
+  el.scrollTo({ top: idx*DT_ROW_H, behavior:"smooth" });
+  // 平滑滚动约 300ms 内的 scroll 事件都忽略，结束后解锁
+  const done=()=>{ if(el===dtHoursEl) _dtLockH=Math.max(0,_dtLockH-1); else _dtLockM=Math.max(0,_dtLockM-1); };
+  setTimeout(done, 360);
+}
+// 瞬时定位（初始化用），同样加锁避免初始 scroll 触发吸附
+function scrollWheelInstant(el, val, step){
+  const idx=Math.round(val/step);
+  if(el===dtHoursEl) _dtLockH++; else _dtLockM++;
+  el.scrollTop=idx*DT_ROW_H;
+  const done=()=>{ if(el===dtHoursEl) _dtLockH=Math.max(0,_dtLockH-1); else _dtLockM=Math.max(0,_dtLockM-1); };
+  setTimeout(done, 80);
+}
+// 仅更新高亮（不读滚动位置）
+function setWheelHighlight(el, val){
+  el.querySelectorAll(".wc").forEach(c=>{ if(c.dataset.val!==undefined) c.classList.toggle("sel", Number(c.dataset.val)===val); });
 }
 // 当前滚动位置对应的值 + 更新高亮
 function wheelValue(el, count, step){
   const idx=Math.round(el.scrollTop/DT_ROW_H);
   const val=Math.min(count-step, Math.max(0, idx*step));
-  el.querySelectorAll(".wc").forEach(c=>{ if(c.dataset.val!==undefined) c.classList.toggle("sel", Number(c.dataset.val)===val); });
+  setWheelHighlight(el, val);
   return val;
 }
 function renderDtTime(){
@@ -2624,34 +2647,39 @@ function renderDtTime(){
   buildWheel(dtHoursEl, 24, 1, _dtHour);
   buildWheel(dtMinsEl, 60, 1, _dtMin);
   syncTimeInputs();
-  // 初始定位（等布局稳定后瞬时滚到位）
-  requestAnimationFrame(()=>{ scrollWheelTo(dtHoursEl,_dtHour,1,false); scrollWheelTo(dtMinsEl,_dtMin,1,false); });
+  // 初始定位（等布局稳定后瞬时滚到位，加锁避免触发吸附）
+  requestAnimationFrame(()=>{ scrollWheelInstant(dtHoursEl,_dtHour,1); scrollWheelInstant(dtMinsEl,_dtMin,1); });
 }
 function syncTimeInputs(){
   if(document.activeElement!==dtHourInputEl) dtHourInputEl.value=pad2(_dtHour);
   if(document.activeElement!==dtMinInputEl)  dtMinInputEl.value=pad2(_dtMin);
 }
-// 滚动结束吸附：停 120ms 后取整、回滚到格、更新状态与输入框
+// 用户手动滚动结束后吸附：停 110ms 后取整、回滚到格、更新状态与输入框
+// 程序化滚动（点击/输入定位）期间 _dtLock>0，直接忽略，避免与用户点击冲突产生"跳"
 function onWheelScroll(el, which){
-  clearTimeout(_dtSnapTimer);
-  // 实时更新高亮（滚动中即时反馈）
-  if(which==="h") wheelValue(dtHoursEl,24,1); else wheelValue(dtMinsEl,60,1);
-  _dtSnapTimer=setTimeout(()=>{
-    if(which==="h"){ _dtHour=wheelValue(dtHoursEl,24,1); scrollWheelTo(dtHoursEl,_dtHour,1,true); }
-    else{ _dtMin=wheelValue(dtMinsEl,60,1); scrollWheelTo(dtMinsEl,_dtMin,1,true); }
-    syncTimeInputs();
-  },120);
+  const locked = which==="h" ? _dtLockH>0 : _dtLockM>0;
+  if(locked) return;
+  // 滚动中即时更新高亮
+  wheelValue(el, which==="h"?24:60, 1);
+  if(which==="h"){ clearTimeout(_dtSnapH); _dtSnapH=setTimeout(()=>finishSnap(el,"h"),110); }
+  else{ clearTimeout(_dtSnapM); _dtSnapM=setTimeout(()=>finishSnap(el,"m"),110); }
+}
+function finishSnap(el, which){
+  const val=wheelValue(el, which==="h"?24:60, 1);
+  if(which==="h") _dtHour=val; else _dtMin=val;
+  syncTimeInputs();
+  scrollWheelToLocked(el, val, 1);   // 回吸到整格（加锁，不再触发本函数）
 }
 dtHoursEl.addEventListener("scroll",()=>onWheelScroll(dtHoursEl,"h"));
 dtMinsEl.addEventListener("scroll",()=>onWheelScroll(dtMinsEl,"m"));
 // 输入框直接敲数字：改值即滚轮跟随
 dtHourInputEl.addEventListener("input",()=>{
   const n=parseInt(dtHourInputEl.value.replace(/\D/g,""),10);
-  if(Number.isFinite(n) && n>=0 && n<=23){ _dtHour=n; scrollWheelTo(dtHoursEl,n,1,true); wheelValue(dtHoursEl,24,1); }
+  if(Number.isFinite(n) && n>=0 && n<=23){ _dtHour=n; setWheelHighlight(dtHoursEl,n); scrollWheelToLocked(dtHoursEl,n,1); }
 });
 dtMinInputEl.addEventListener("input",()=>{
   const n=parseInt(dtMinInputEl.value.replace(/\D/g,""),10);
-  if(Number.isFinite(n) && n>=0 && n<=59){ _dtMin=n; scrollWheelTo(dtMinsEl,n,1,true); wheelValue(dtMinsEl,60,1); }
+  if(Number.isFinite(n) && n>=0 && n<=59){ _dtMin=n; setWheelHighlight(dtMinsEl,n); scrollWheelToLocked(dtMinsEl,n,1); }
 });
 // 失焦时补零/纠正越界
 function clampInput(el, max, setter){
@@ -2660,8 +2688,8 @@ function clampInput(el, max, setter){
   n=Math.min(max, Math.max(0, n));
   el.value=pad2(n); return n;
 }
-dtHourInputEl.addEventListener("blur",()=>{ _dtHour=clampInput(dtHourInputEl,23,()=>_dtHour); scrollWheelTo(dtHoursEl,_dtHour,1,true); wheelValue(dtHoursEl,24,1); });
-dtMinInputEl.addEventListener("blur",()=>{ _dtMin=clampInput(dtMinInputEl,59,()=>_dtMin); scrollWheelTo(dtMinsEl,_dtMin,1,true); wheelValue(dtMinsEl,60,1); });
+dtHourInputEl.addEventListener("blur",()=>{ _dtHour=clampInput(dtHourInputEl,23,()=>_dtHour); setWheelHighlight(dtHoursEl,_dtHour); scrollWheelToLocked(dtHoursEl,_dtHour,1); });
+dtMinInputEl.addEventListener("blur",()=>{ _dtMin=clampInput(dtMinInputEl,59,()=>_dtMin); setWheelHighlight(dtMinsEl,_dtMin); scrollWheelToLocked(dtMinsEl,_dtMin,1); });
 dtPrevEl.onclick=()=>{ const d=new Date(_dtCursor+"T00:00:00"); d.setMonth(d.getMonth()-1); _dtCursor=dateStr(d); renderDtGrid(); };
 dtNextEl.onclick=()=>{ const d=new Date(_dtCursor+"T00:00:00"); d.setMonth(d.getMonth()+1); _dtCursor=dateStr(d); renderDtGrid(); };
 dtClearEl.onclick=()=>closeDatePicker(null);
