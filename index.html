@@ -30,6 +30,8 @@
     --nav-h:64px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  /* 锁定文字缩放：安卓 WebView / 部分浏览器会自动放大正文，导致装成 App 后字体偏大 */
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   html,body{height:100%;margin:0;}
   /* 用动态视口高度：普通浏览器里地址栏/底栏会占空间，svh/dvh 能自适应，避免底部导航被挡 */
   body{
@@ -263,6 +265,10 @@
   .nav-item .ni{font-size:21px;line-height:1;display:flex;align-items:center;justify-content:center;}
   .nav-item .ni svg{width:23px;height:23px;display:block;}
   .nav-item.active{color:var(--accent);}
+  /* 桌面端（有鼠标）：悬停导航项即预览高亮，配合 JS 直接切换到对应视图 */
+  @media (hover:hover) and (pointer:fine){
+    .nav-item:hover{color:var(--accent);}
+  }
 
   /* ---- header 模式切换图标（清单/时间轴） ---- */
   .mode-toggle{display:flex;align-items:center;cursor:pointer;color:var(--sub);user-select:none;padding:2px;}
@@ -324,6 +330,12 @@
   }
   .dialog-input:focus{border-color:var(--accent);background:var(--card);}
   .dialog-btns{display:flex;flex-direction:column;gap:9px;margin-top:20px;}
+  /* 可滚动列表型弹窗：任务多时限高、内部滚动，避免撑满全屏无法退出 */
+  .dialog-btns.scroll{max-height:min(46vh,300px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;}
+  .dialog-search{width:100%;margin-top:14px;padding:11px 14px;border:1px solid var(--line);border-radius:14px;
+    font-size:15px;color:var(--ink);background:var(--bg);outline:none;box-sizing:border-box;transition:.15s;}
+  .dialog-search:focus{border-color:var(--accent);background:var(--card);}
+  .dialog-empty{font-size:13px;color:var(--sub);text-align:center;padding:14px 0;}
   .dialog-btns .btn{padding:13px;border-radius:15px;font-size:16px;font-weight:600;cursor:pointer;user-select:none;border:none;text-align:center;}
   .dialog-btns .btn.ghost{background:var(--bg);color:var(--ink);}
   .dialog-btns .btn.ghost:active{background:var(--accent-soft);}
@@ -824,6 +836,65 @@ function dlgPrompt(title,{msg="",value="",placeholder="",okLabel="确定"}={}){
     {label:"取消",style:"ghost",value:null},
   ]});
 }
+// 可滚动 + 可搜索的列表选择器：任务多时不再撑满全屏。items:[{label,value,note}]，返回选中的 value 或 null
+function dlgPickList(title, items, {searchable=true, msg=""}={}){
+  return new Promise(resolve=>{
+    const mask=dlgMask();
+    mask.querySelector("#dialogTitle").textContent=title;
+    const msgEl=mask.querySelector("#dialogMsg");
+    msgEl.textContent=msg; msgEl.style.display=msg?"block":"none";
+    const inp=mask.querySelector("#dialogInput"); inp.style.display="none";
+    const btnBox=mask.querySelector("#dialogBtns");
+    // 搜索框（仅项目较多且开启时显示）
+    let searchEl=mask.querySelector("#dialogSearch");
+    const wantSearch=searchable && items.length>6;
+    if(wantSearch){
+      if(!searchEl){
+        searchEl=document.createElement("input");
+        searchEl.id="dialogSearch"; searchEl.className="dialog-search"; searchEl.type="text";
+        searchEl.setAttribute("inputmode","search");
+        btnBox.parentNode.insertBefore(searchEl, btnBox);
+      }
+      searchEl.style.display="block"; searchEl.value=""; searchEl.placeholder="搜索…";
+    }else if(searchEl){ searchEl.style.display="none"; }
+
+    const done=(val)=>{
+      _closeDialog(); mask.onclick=null; document.removeEventListener("keydown",onKey);
+      btnBox.classList.remove("scroll");
+      if(searchEl){ searchEl.oninput=null; searchEl.style.display="none"; }
+      resolve(val);
+    };
+    const render=(kw)=>{
+      btnBox.innerHTML="";
+      const q=(kw||"").trim().toLowerCase();
+      const list=q? items.filter(it=>it.label.toLowerCase().includes(q)) : items;
+      btnBox.classList.add("scroll");
+      if(!list.length){
+        const e=document.createElement("div"); e.className="dialog-empty"; e.textContent="没有匹配的任务";
+        btnBox.appendChild(e);
+      }else{
+        list.forEach(it=>{
+          const el=document.createElement("div");
+          el.className="btn ghost"; el.textContent=it.label;
+          el.onclick=()=>done(it.value);
+          btnBox.appendChild(el);
+        });
+      }
+      // 取消按钮固定在底部（不随滚动区）
+      const cancel=document.createElement("div");
+      cancel.className="btn ghost"; cancel.textContent="取消";
+      cancel.style.marginTop="4px"; cancel.onclick=()=>done(null);
+      btnBox.appendChild(cancel);
+    };
+    render("");
+    if(wantSearch) searchEl.oninput=()=>render(searchEl.value);
+    mask.onclick=(e)=>{ if(e.target===mask) done(null); };
+    const onKey=(e)=>{ if(e.key==="Escape") done(null); };
+    document.addEventListener("keydown",onKey);
+    mask.classList.add("show");
+    if(wantSearch) setTimeout(()=>searchEl.focus(),60);
+  });
+}
 
 /* ---------- 数据 ----------
  state = {
@@ -1202,6 +1273,14 @@ function renderTabs(){
     t.addEventListener("touchstart",()=>{ lpTimer=setTimeout(()=>manageList(i),550); },{passive:true});
     t.addEventListener("touchend",()=>clearTimeout(lpTimer),{passive:true});
     t.addEventListener("touchmove",()=>clearTimeout(lpTimer),{passive:true});
+    // 桌面端：悬停即切到该清单（不含"管理"，避免误触）
+    if(_isDesktopHover){
+      t.addEventListener("mouseenter",()=>{
+        clearTimeout(_tabHoverT);
+        _tabHoverT=setTimeout(()=>{ if(i!==current) goTo(i); },120);
+      });
+      t.addEventListener("mouseleave",()=>clearTimeout(_tabHoverT));
+    }
     tabsEl.appendChild(t);
   });
   const add=document.createElement("div");
@@ -1742,9 +1821,8 @@ async function openSessionEditor(sessionObj){
   // —— 新增（补记）：先选归属任务，再选起止时间 ——
   let task=leaves[0];
   if(leaves.length>1){
-    const btns=leaves.map(t=>({label:t.text, style:"ghost", value:t.id}));
-    btns.push({label:"取消",style:"ghost",value:null});
-    const pick=await _openDialog({ title:"这段专注属于哪个任务？", buttons:btns });
+    const items=leaves.map(t=>({label:t.text, value:t.id}));
+    const pick=await dlgPickList("这段专注属于哪个任务？", items);
     if(pick===null||pick===undefined) return;
     task=leaves.find(t=>t.id===pick)||task;
   }
@@ -1759,9 +1837,8 @@ async function openSessionEditor(sessionObj){
 }
 // 只改归属任务
 async function editSessionTask(sessionObj, leaves){
-  const btns=leaves.map(t=>({label:t.text+(t===sessionObj.task?" ·当前":""), style:"ghost", value:t.id}));
-  btns.push({label:"取消",style:"ghost",value:null});
-  const pick=await _openDialog({ title:`这段专注属于哪个任务？`, buttons:btns });
+  const items=leaves.map(t=>({label:t.text+(t===sessionObj.task?" ·当前":""), value:t.id}));
+  const pick=await dlgPickList("这段专注属于哪个任务？", items);
   if(pick===null||pick===undefined) return;
   const task=leaves.find(t=>t.id===pick);
   if(!task || task===sessionObj.task) return;
@@ -2474,6 +2551,20 @@ function switchView(v){
 navEl.querySelectorAll(".nav-item").forEach(it=>{
   it.onclick=()=>switchView(it.dataset.view);
 });
+// 桌面端（有精确指针+悬停能力）：hover 到导航项即切换视图，无需点击
+const _isDesktopHover = !!(window.matchMedia && window.matchMedia("(hover:hover) and (pointer:fine)").matches);
+let _tabHoverT=null;
+if(_isDesktopHover){
+  let _navHoverT=null;
+  navEl.querySelectorAll(".nav-item").forEach(it=>{
+    it.addEventListener("mouseenter",()=>{
+      clearTimeout(_navHoverT);
+      // 轻微延迟，避免鼠标划过途中误触发多次切换
+      _navHoverT=setTimeout(()=>{ if(it.dataset.view!==view) switchView(it.dataset.view); },120);
+    });
+    it.addEventListener("mouseleave",()=>clearTimeout(_navHoverT));
+  });
+}
 
 /* ---------- 日期轴：前后翻天 / 直接选日期 ---------- */
 function goToDate(str){
