@@ -2995,14 +2995,35 @@ async function pickFsaFile(){
     return doSyncNow();
   }catch(e){ if(e&&e.name==="AbortError") return; await dlgAlert((e&&e.message)||"选择失败","❌ 出错"); }
 }
-// 手动同步：先拉合并，再推送
+// 明确方向的同步菜单：不再让时间戳偷偷决定，避免空白新设备覆盖云端好数据
 async function doSyncNow(){
   if(_syncing) return;
+  const act=await _openDialog({title:"选择同步方向",msg:
+    "· 本机是新装/空的、云端有数据 → 选「从云端拉取」\n· 本机数据是对的、想上传 → 选「推送到云端」\n· 平时增量同步 → 选「智能同步」",
+    buttons:[
+      {label:"从云端拉取（覆盖本机）",style:"ghost",value:"pull"},
+      {label:"推送到云端（覆盖云端）",style:"ghost",value:"push"},
+      {label:"智能同步（按时间新旧）",style:"ghost",value:"auto"},
+      {label:"取消",style:"ghost",value:null},
+    ]});
+  if(!act) return;
   _syncing=true;
   try{
-    const r=await syncPull();
-    await syncPush();
-    await dlgAlert(r.applied?"已拉取云端更新并合并。":"已推送本地数据到云端。","✅ 同步完成");
+    if(act==="pull"){
+      const ok=await dlgConfirm("将用云端数据覆盖本机当前数据，本机未同步的改动会丢失。",{title:"从云端拉取？",okLabel:"拉取覆盖",danger:true});
+      if(!ok) return;
+      const r=await syncPullForce();
+      await dlgAlert(r.empty?"云端还没有数据。":"已用云端数据覆盖本机。","✅ 拉取完成");
+    }else if(act==="push"){
+      const ok=await dlgConfirm("将用本机数据覆盖云端文件，云端原内容会被替换。",{title:"推送到云端？",okLabel:"推送覆盖",danger:true});
+      if(!ok) return;
+      await syncPushForce();
+      await dlgAlert("已用本机数据覆盖云端。","✅ 推送完成");
+    }else{
+      const r=await syncPull();
+      await syncPush();
+      await dlgAlert(r.applied?"云端较新，已拉取并覆盖本机，同时回推。":"本机较新，已推送到云端。","✅ 智能同步完成");
+    }
   }catch(e){ await dlgAlert((e&&e.message)||"同步失败","❌ 同步失败"); }
   finally{ _syncing=false; }
 }
@@ -3014,7 +3035,8 @@ document.getElementById("syncBtn").onclick=openSyncDialog;
    - Windows 桌面 Chrome/Edge（showSaveFilePicker）：读写坚果云客户端同步文件夹里的 state.json
    合并策略：last-write-wins，按 updatedAt 毫秒时间戳判定，谁新用谁的整份 state。
    凭证只存 localStorage，绝不写进代码 / 提交到公开仓库。 */
-let _syncUpdatedAt = (function(){ const v=+localStorage.getItem(SYNC_TS_KEY); return v>0?v:Date.now(); })();
+// 新设备/没编辑过时默认 0：绝不能让"空白新设备"在时间戳上盖过云端真实数据
+let _syncUpdatedAt = (function(){ const v=+localStorage.getItem(SYNC_TS_KEY); return v>0?v:0; })();
 let _syncPushTimer = null;
 let _syncing = false;
 
@@ -3027,6 +3049,13 @@ function payloadState(p){
   if(p.state && p.state.day) return p.state;
   if(p.day) return p;   // 直接是 state
   return null;
+}
+// 远端时间戳：优先 updatedAt；旧备份没有则回退用 exportedAt 解析
+function payloadTs(p){
+  if(!p) return 0;
+  if(+p.updatedAt>0) return +p.updatedAt;
+  if(p.exportedAt){ const t=Date.parse(p.exportedAt); if(t>0) return t; }
+  return 0;
 }
 
 /* ---- 后端选择：安卓→WebDAV；Windows Chrome/Edge→本地文件；否则无 ---- */
@@ -3111,25 +3140,39 @@ function currentBackend(){
 }
 
 /* ---- 拉取合并 / 推送 ---- */
+// 把一份远端 payload 应用到本地（覆盖），并对齐时间戳
+function applyRemote(remote){
+  const rs=payloadState(remote); if(!rs) return false;
+  state=rs;
+  _syncUpdatedAt=payloadTs(remote)||Date.now();
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); localStorage.setItem(SYNC_TS_KEY,String(_syncUpdatedAt)); }catch(e){}
+  expanded={}; current=0; switchView(view||"day");
+  return true;
+}
+// 智能拉取：仅当云端更新时才覆盖本地（时间戳比较）
 async function syncPull(){
   const be=currentBackend(); if(!be) return {ok:false, reason:"无同步后端"};
   const remote=await be.read();
-  const rs=payloadState(remote);
-  if(!rs) return {ok:true, applied:false};   // 云端还没有数据
-  const rTs=+(remote.updatedAt||0);
-  if(rTs>_syncUpdatedAt){
-    state=rs;
-    _syncUpdatedAt=rTs;
-    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); localStorage.setItem(SYNC_TS_KEY,String(_syncUpdatedAt)); }catch(e){}
-    expanded={}; current=0; switchView(view||"day");
-    return {ok:true, applied:true};
-  }
+  if(!payloadState(remote)) return {ok:true, applied:false};   // 云端还没有数据
+  if(payloadTs(remote) > _syncUpdatedAt){ applyRemote(remote); return {ok:true, applied:true}; }
   return {ok:true, applied:false};
 }
 async function syncPush(){
   const be=currentBackend(); if(!be) return {ok:false, reason:"无同步后端"};
   await be.write(syncPayload());
   return {ok:true};
+}
+// 强制拉取：无条件用云端覆盖本机（用户明确选择）
+async function syncPullForce(){
+  const be=currentBackend(); if(!be) throw new Error("无同步后端");
+  const remote=await be.read();
+  if(!payloadState(remote)) return {ok:true, applied:false, empty:true};
+  applyRemote(remote); return {ok:true, applied:true};
+}
+// 强制推送：无条件用本机覆盖云端（用户明确选择）
+async function syncPushForce(){
+  if(!_syncUpdatedAt) _syncUpdatedAt=Date.now();   // 本机首次推送前补一个时间戳
+  return syncPush();
 }
 // save() 后防抖推送（约 2s）；无后端 / 未配置时静默跳过
 function scheduleSyncPush(){
