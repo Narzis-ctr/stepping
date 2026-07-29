@@ -345,6 +345,15 @@
   }
   .tl-block b{font-weight:600;}
   .tl-block .bt{opacity:.85;font-size:11px;}
+  .tl-block{cursor:pointer;transition:transform .1s,box-shadow .1s;}
+  .tl-block:active{transform:scale(.98);}
+  /* 补记按钮：空态大按钮 + 时间轴标题旁小入口 */
+  .tl-add-btn{display:inline-block;margin-top:18px;padding:10px 20px;border-radius:14px;
+    background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;user-select:none;}
+  .tl-add-btn:active{transform:scale(.97);}
+  .tl-add-inline{font-size:13px;color:var(--accent);background:var(--accent-soft);
+    padding:5px 12px;border-radius:10px;cursor:pointer;user-select:none;font-weight:600;}
+  .tl-add-inline:active{transform:scale(.96);}
   .tl-sec-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px;}
   .tl-sec-head h3{font-size:15px;font-weight:700;margin:0;color:var(--ink);}
   .tl-chart-toggle{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:3px;}
@@ -1525,20 +1534,35 @@ function colorOf(id){
   let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0;
   return TL_COLORS[h%TL_COLORS.length];
 }
-// 收集某天（YYYY-MM-DD）所有 session，附带所属任务
+// 收集某天（YYYY-MM-DD）所有 session，保留对原 session 对象的引用（ref）以便编辑/删除
 function daySessions(dateStr_){
   const out=[];
   state.day.lists.forEach(l=>(l.tasks||[]).forEach(t=>{
     (t.sessions||[]).forEach(s=>{
-      if(dateStr(new Date(s.start))===dateStr_) out.push({ task:t, ...s });
+      if(dateStr(new Date(s.start))===dateStr_) out.push({ task:t, ref:s });
     });
   }));
-  return out.sort((a,b)=>a.start-b.start);
+  return out.sort((a,b)=>a.ref.start-b.ref.start);
+}
+// 当天所有"叶子任务"（无子任务），作为补记专注时的可选目标
+function dayLeafTasks(){
+  const out=[];
+  const walk=t=>{ const k=childrenOf(t); if(k.length) k.forEach(walk); else out.push(t); };
+  state.day.lists.forEach(l=>(l.tasks||[]).forEach(walk));
+  return out;
 }
 function renderTimeline(){
   const sessions=daySessions(currentDate);
   if(!sessions.length){
-    singleEl.innerHTML='<div class="tl-empty"><span class="big">🍅</span>今天还没有专注记录<br>点任务上的「▶ 专注」开始第一段番茄钟</div>';
+    singleEl.innerHTML='';
+    const em=document.createElement("div");
+    em.className="tl-empty";
+    em.innerHTML='<span class="big">🍅</span>今天还没有专注记录<br>点任务上的「▶ 专注」开始一段番茄钟<br>或手动补记一段';
+    const addBtn=document.createElement("div");
+    addBtn.className="tl-add-btn"; addBtn.textContent="＋ 补记一段专注";
+    addBtn.onclick=()=>openSessionEditor(null);
+    em.appendChild(addBtn);
+    singleEl.appendChild(em);
     return;
   }
   const wrap=document.createElement("div");
@@ -1546,7 +1570,7 @@ function renderTimeline(){
 
   // —— 专注分布：默认扇形图，可切条形图（放在最前面）——
   const byTask={};
-  sessions.forEach(s=>{ (byTask[s.task.id] ||= {task:s.task, sec:0}).sec+=s.focusSec||0; });
+  sessions.forEach(s=>{ (byTask[s.task.id] ||= {task:s.task, sec:0}).sec+=s.ref.focusSec||0; });
   const rows=Object.values(byTask).sort((a,b)=>b.sec-a.sec);
   const totalSec=rows.reduce((s,r)=>s+r.sec,0);
 
@@ -1578,10 +1602,15 @@ function renderTimeline(){
   tlHead.className="tl-sec-head";
   tlHead.style.marginTop="4px";
   tlHead.innerHTML="<h3>时间轴</h3>";
+  const addSeg=document.createElement("div");
+  addSeg.className="tl-add-inline"; addSeg.textContent="＋ 补记";
+  addSeg.title="手动补记一段专注";
+  addSeg.onclick=()=>openSessionEditor(null);
+  tlHead.appendChild(addSeg);
   wrap.appendChild(tlHead);
 
-  const minS=Math.min(...sessions.map(s=>s.start));
-  const maxE=Math.max(...sessions.map(s=>s.end));
+  const minS=Math.min(...sessions.map(s=>s.ref.start));
+  const maxE=Math.max(...sessions.map(s=>s.ref.end));
   const startH=Math.max(0, new Date(minS).getHours() - (new Date(minS).getMinutes()<30?1:0));
   let endH=new Date(maxE).getHours() + (new Date(maxE).getMinutes()>0?1:0) + (new Date(maxE).getMinutes()>=30?1:0);
   endH=Math.min(24, Math.max(endH, startH+1));
@@ -1605,14 +1634,16 @@ function renderTimeline(){
   sessions.forEach(s=>{
     const b=document.createElement("div");
     b.className="tl-block";
-    const y=(s.start-top)/span*gridH;
-    let h=(s.end-s.start)/span*gridH;
+    const y=(s.ref.start-top)/span*gridH;
+    let h=(s.ref.end-s.ref.start)/span*gridH;
     if(h<18) h=18;   // 太短也要看得见
     b.style.top=y+"px"; b.style.height=h+"px";
     b.style.background=colorOf(s.task.id);
-    const t1=new Date(s.start), t2=new Date(s.end);
+    const t1=new Date(s.ref.start), t2=new Date(s.ref.end);
     const hm=d=>`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
     b.innerHTML=`<b>${escapeHtml(s.task.text)}</b> <span class="bt">${hm(t1)}–${hm(t2)}</span>`;
+    b.title="点击可修改或删除这段专注";
+    b.onclick=()=>openSessionEditor(s);   // 点击块 → 编辑/删除
     blocks.appendChild(b);
   });
   grid.appendChild(blocks);
@@ -1673,6 +1704,91 @@ function renderChart(box, rows, totalSec){
     tot.className="tl-total"; tot.textContent="共 "+fmtDur(totalSec)+" · "+rows.length+" 个任务";
     box.appendChild(tot);
   }
+}
+
+/* ---------- 专注段编辑：新增 / 修改开始结束 / 删除 ----------
+   sessionObj===null 表示新增；否则编辑 {task, ref} */
+async function openSessionEditor(sessionObj){
+  const leaves=dayLeafTasks();
+  const isNew=!sessionObj;
+  // 新增时若当天没有任何叶子任务，无法归属，提示
+  if(isNew && !leaves.length){ dlgAlert("当天还没有可归属的任务，先在清单里添加一个任务。"); return; }
+
+  let task = isNew ? null : sessionObj.task;
+  // 编辑已有段：先给「修改 / 删除 / 取消」三选一
+  if(!isNew){
+    const t1=new Date(sessionObj.ref.start), t2=new Date(sessionObj.ref.end);
+    const hm=d=>`${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const choice=await _openDialog({
+      title:`「${task.text}」 ${hm(t1)}–${hm(t2)}`,
+      buttons:[
+        {label:"修改时间",style:"ghost",value:"edit"},
+        {label:"删除这段",style:"ghost",value:"del"},
+        {label:"取消",style:"ghost",value:null},
+      ],
+    });
+    if(choice===null||choice===undefined) return;
+    if(choice==="del"){ await deleteSession(sessionObj); return; }
+  }
+  // 默认时间：编辑用原值；新增给"现在往前 25 分钟"，落在当前查看日期
+  let startMs, endMs;
+  if(isNew){
+    const now=new Date();
+    const [y,m,d]=currentDate.split("-").map(Number);
+    endMs=new Date(y,m-1,d, now.getHours(), now.getMinutes()).getTime();
+    startMs=endMs-25*60000;
+  }else{ startMs=sessionObj.ref.start; endMs=sessionObj.ref.end; }
+
+  // 1) 选/确认归属任务（新增必选；编辑可换）
+  if(isNew || leaves.length>1){
+    const btns=leaves.map(t=>({label:t.text, style:"ghost", value:t.id}));
+    btns.push({label:"取消",style:"ghost",value:null});
+    const preTitle = isNew? "这段专注属于哪个任务？" : `属于「${task.text}」，换个任务？`;
+    const pick=await _openDialog({ title:preTitle, buttons:btns });
+    if(pick===null||pick===undefined){ if(isNew) return; }   // 编辑时取消换任务 → 保持原任务
+    else task=leaves.find(t=>t.id===pick)||task;
+  }
+  if(!task) return;
+
+  // 2) 选开始时间
+  const toStr=ms=>{ const d=new Date(ms); return `${dateStr(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+  const s1=await openDatePicker({ value:toStr(startMs), withTime:true, title:"开始时间" });
+  if(s1===undefined) return;              // 取消整个流程
+  if(s1===null){ /* 清除 → 视为放弃 */ return; }
+  startMs=new Date(s1).getTime();
+
+  // 3) 选结束时间
+  const s2=await openDatePicker({ value:toStr(endMs<=startMs? startMs+25*60000 : endMs), withTime:true, title:"结束时间" });
+  if(s2===undefined) return;
+  if(s2===null) return;
+  endMs=new Date(s2).getTime();
+
+  if(endMs<=startMs){ dlgAlert("结束时间要晚于开始时间。"); return; }
+  const focusSec=Math.round((endMs-startMs)/1000);
+  if(focusSec>24*3600){ dlgAlert("单段专注不超过 24 小时。"); return; }
+
+  if(isNew){
+    if(!task.sessions) task.sessions=[];
+    task.sessions.push({ start:startMs, end:endMs, focusSec, manual:true });
+  }else{
+    // 若换了任务，需把 session 从旧任务挪到新任务
+    if(task!==sessionObj.task){
+      const arr=sessionObj.task.sessions||[];
+      const i=arr.indexOf(sessionObj.ref); if(i>=0) arr.splice(i,1);
+      if(!task.sessions) task.sessions=[];
+      task.sessions.push(sessionObj.ref);
+    }
+    sessionObj.ref.start=startMs; sessionObj.ref.end=endMs; sessionObj.ref.focusSec=focusSec;
+  }
+  save(); rerender();
+}
+// 单独的删除入口：编辑弹层里点"删除这段"时调用
+async function deleteSession(sessionObj){
+  const ok=await dlgConfirm("这段专注记录会被移除，不影响任务本身。",{title:"删除这段专注？",okLabel:"删除",danger:true});
+  if(!ok) return false;
+  const arr=sessionObj.task.sessions||[];
+  const i=arr.indexOf(sessionObj.ref); if(i>=0) arr.splice(i,1);
+  save(); rerender(); return true;
 }
 
 /* ---------- 月度概览：本月各目标铺在哪几天、哪些没动 ---------- */
@@ -1922,7 +2038,7 @@ function updateHeader(){
     titleEl.textContent="时间轴";
     subtitleEl.className="subtitle";
     subtitleEl.textContent="今天的时间都花在哪了";
-    const secs=daySessions(currentDate).reduce((s,x)=>s+(x.focusSec||0),0);
+    const secs=daySessions(currentDate).reduce((s,x)=>s+(x.ref.focusSec||0),0);
     countEl.textContent= secs>0? "共专注 "+fmtDur(secs) : "";
   }else if(view==="day"){
     const list=state.day.lists[current];
