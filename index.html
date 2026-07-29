@@ -547,6 +547,7 @@
       <div class="head-tools">
         <div class="head-icons">
           <span class="mode-toggle" id="modeToggle"></span>
+          <span id="syncBtn" title="云同步" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.34 9.5 4 4 0 0 0 7 17.4"/><path d="M12 21V11m0 0l-3 3m3-3l3 3"/></svg></span>
           <span id="backupBtn" title="备份 / 恢复" style="cursor:pointer;opacity:.5;user-select:none;display:flex;align-items:center;"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></span>
         </div>
         <div class="datenav hidden" id="datenav">
@@ -764,6 +765,8 @@
 <script>
 const STORE_KEY = "shiguang.v3";
 const TIMER_KEY = "shiguang.timer";   // 活动中的番茄钟，刷新/切后台不丢
+const SYNC_TS_KEY = "shiguang.sync.updatedAt";   // 本地数据最后修改时间戳（毫秒），用于云同步冲突判定
+const SYNC_CFG_KEY = "shiguang.sync.webdav";     // WebDAV 凭证（服务器/邮箱/应用密码）——仅存本地，绝不入代码
 const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
 const VIEW_TITLE = { day:"日程", week:"周计划", month:"月计划", year:"年度目标" };
 const VIEW_PLACEHOLDER = {
@@ -970,7 +973,10 @@ function migrate(d){
 }
 function save(){
   try{
+    _syncUpdatedAt = Date.now();
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(SYNC_TS_KEY, String(_syncUpdatedAt));
+    scheduleSyncPush();   // 存成功后防抖推送到云端（无后端时静默跳过）
     return true;
   }catch(e){
     // 存储失败（隐私模式/配额满）时提醒用户，避免以为存上了其实没存
@@ -2919,7 +2925,225 @@ document.getElementById("backupBtn").onclick=()=>{
   });
 };
 
-/* ---------- PWA：让它能"装"到手机桌面、离线打开 ---------- */
+/* ---------- 云同步设置弹层 ---------- */
+function syncLastText(){
+  const ts=_syncUpdatedAt;
+  if(!ts) return "尚未同步";
+  const d=new Date(ts), pad=n=>String(n).padStart(2,"0");
+  return `本地数据版本：${d.getMonth()+1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+async function openSyncDialog(){
+  const kind=syncBackendKind();
+  if(kind==="webdav") return openWebdavDialog();
+  if(kind==="fsa") return openFsaDialog();
+  // 无可用后端：说明为什么
+  await dlgAlert(
+    "当前环境无法直接连云端：\n· 安卓请用打包好的 App（可直连坚果云）\n· Windows 请用桌面版 Chrome / Edge 打开本页\n\n随时可用「备份 / 恢复」手动导出导入。",
+    "☁️ 云同步不可用");
+}
+// 安卓：WebDAV 凭证配置
+async function openWebdavDialog(){
+  const cfg=webdavCfg()||{ server:"https://dav.jianguoyun.com/dav/", user:"", pass:"" };
+  const server=await dlgPrompt("坚果云服务器地址",{value:cfg.server,placeholder:"https://dav.jianguoyun.com/dav/"});
+  if(server===null) return;
+  const user=await dlgPrompt("坚果云账号（邮箱）",{value:cfg.user,placeholder:"you@example.com"});
+  if(user===null) return;
+  const pass=await dlgPrompt("坚果云应用密码",{value:cfg.pass,msg:"在坚果云「账户信息 → 安全选项 → 添加应用密码」生成，不是登录密码。仅存本机。"});
+  if(pass===null) return;
+  const nc={ server:server.trim(), user:user.trim(), pass:pass.trim() };
+  if(!nc.server||!nc.user||!nc.pass){ await dlgAlert("三项都要填写。"); return; }
+  try{ localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(nc)); }catch(e){}
+  const act=await _openDialog({title:"☁️ 坚果云同步",msg:syncLastText(),buttons:[
+    {label:"测试连接",style:"ghost",value:"test"},
+    {label:"立即同步",style:"ghost",value:"now"},
+    {label:"完成",style:"ghost",value:null},
+  ]});
+  if(act==="test") return testWebdav();
+  if(act==="now") return doSyncNow();
+}
+async function testWebdav(){
+  try{
+    await webdavBackend.read();   // 404 也算通（返回 null 不抛错）
+    await dlgAlert("连接正常，账号密码可用。","✅ 测试成功");
+  }catch(e){ await dlgAlert((e&&e.message)||"连接失败","❌ 测试失败"); }
+}
+// Windows：File System Access 选文件
+async function openFsaDialog(){
+  const has=!!(await fsaGetHandle().catch(()=>null));
+  const act=await _openDialog({title:"☁️ 本地文件夹同步",msg:
+    (has?"已绑定同步文件。":"请选择坚果云同步文件夹里的 state.json（首次可新建）。")+"\n"+syncLastText(),
+    buttons:[
+      {label:has?"重新选择同步文件":"选择同步文件",style:"ghost",value:"pick"},
+      {label:"立即同步",style:"ghost",value:"now"},
+      {label:"完成",style:"ghost",value:null},
+    ]});
+  if(act==="pick") return pickFsaFile();
+  if(act==="now") return doSyncNow();
+}
+async function pickFsaFile(){
+  try{
+    let handle;
+    if(window.showSaveFilePicker){
+      handle=await window.showSaveFilePicker({ suggestedName:"state.json",
+        types:[{description:"步步同步文件",accept:{"application/json":[".json"]}}] });
+    }else{
+      [handle]=await window.showOpenFilePicker({
+        types:[{description:"步步同步文件",accept:{"application/json":[".json"]}}] });
+    }
+    _fsaHandle=handle; await _idb.set("fileHandle", handle);
+    await dlgAlert("已绑定同步文件，之后自动读写。","✅ 绑定成功");
+    return doSyncNow();
+  }catch(e){ if(e&&e.name==="AbortError") return; await dlgAlert((e&&e.message)||"选择失败","❌ 出错"); }
+}
+// 手动同步：先拉合并，再推送
+async function doSyncNow(){
+  if(_syncing) return;
+  _syncing=true;
+  try{
+    const r=await syncPull();
+    await syncPush();
+    await dlgAlert(r.applied?"已拉取云端更新并合并。":"已推送本地数据到云端。","✅ 同步完成");
+  }catch(e){ await dlgAlert((e&&e.message)||"同步失败","❌ 同步失败"); }
+  finally{ _syncing=false; }
+}
+document.getElementById("syncBtn").onclick=openSyncDialog;
+
+/* ---------- 云同步（安卓 WebDAV 直连 / Windows 本地文件 File System Access）----------
+   一份云端共享文件，两条访问通道：
+   - 安卓原生 App（window.Capacitor）：CapacitorHttp 绕过 CORS，直连坚果云 WebDAV
+   - Windows 桌面 Chrome/Edge（showSaveFilePicker）：读写坚果云客户端同步文件夹里的 state.json
+   合并策略：last-write-wins，按 updatedAt 毫秒时间戳判定，谁新用谁的整份 state。
+   凭证只存 localStorage，绝不写进代码 / 提交到公开仓库。 */
+let _syncUpdatedAt = (function(){ const v=+localStorage.getItem(SYNC_TS_KEY); return v>0?v:Date.now(); })();
+let _syncPushTimer = null;
+let _syncing = false;
+
+function syncPayload(){
+  return { app:"stepping", version:3, exportedAt:new Date().toISOString(), updatedAt:_syncUpdatedAt, state };
+}
+// 从远端 payload 里取出可用的 state（兼容旧无 updatedAt 的备份格式）
+function payloadState(p){
+  if(!p) return null;
+  if(p.state && p.state.day) return p.state;
+  if(p.day) return p;   // 直接是 state
+  return null;
+}
+
+/* ---- 后端选择：安卓→WebDAV；Windows Chrome/Edge→本地文件；否则无 ---- */
+function syncBackendKind(){
+  if(window.Capacitor) return "webdav";
+  if(window.showOpenFilePicker || window.showSaveFilePicker) return "fsa";
+  return null;
+}
+
+/* ===== WebDAV 后端（安卓原生，走 CapacitorHttp 绕过 CORS）===== */
+function webdavCfg(){
+  try{ const c=JSON.parse(localStorage.getItem(SYNC_CFG_KEY)); if(c&&c.server&&c.user&&c.pass) return c; }catch(e){}
+  return null;
+}
+function webdavUrl(cfg, path){
+  return cfg.server.replace(/\/+$/,"") + "/" + path.replace(/^\/+/,"");
+}
+async function webdavRequest(cfg, method, path, body){
+  const url=webdavUrl(cfg, path);
+  const auth="Basic "+btoa(unescape(encodeURIComponent(cfg.user+":"+cfg.pass)));
+  const headers={ Authorization:auth };
+  if(body!=null) headers["Content-Type"]="application/json";
+  // 安卓下 CapacitorHttp 会把原生响应塞进来；用标准 fetch 接口即可
+  const resp=await fetch(url,{ method, headers, body:body!=null?body:undefined });
+  return resp;
+}
+const webdavBackend = {
+  async read(){
+    const cfg=webdavCfg(); if(!cfg) throw new Error("尚未配置坚果云账号");
+    const resp=await webdavRequest(cfg,"GET","stepping/state.json");
+    if(resp.status===404) return null;
+    if(!resp.ok) throw new Error("读取失败 HTTP "+resp.status);
+    const txt=await resp.text();
+    try{ return JSON.parse(txt); }catch(e){ throw new Error("云端文件格式异常"); }
+  },
+  async write(payload){
+    const cfg=webdavCfg(); if(!cfg) throw new Error("尚未配置坚果云账号");
+    // 先建目录（已存在返回 405，忽略）
+    try{ await webdavRequest(cfg,"MKCOL","stepping/"); }catch(e){}
+    const resp=await webdavRequest(cfg,"PUT","stepping/state.json", JSON.stringify(payload,null,2));
+    if(!resp.ok && resp.status!==201 && resp.status!==204) throw new Error("写入失败 HTTP "+resp.status);
+  },
+};
+
+/* ===== File System Access 后端（Windows Chrome/Edge，读写本地同步文件夹）===== */
+// 文件句柄存 IndexedDB（手写几行，避免引依赖），刷新后免重选
+const _idb={
+  db:null,
+  open(){ return new Promise((res,rej)=>{ if(this.db)return res(this.db);
+    const r=indexedDB.open("shiguang-sync",1);
+    r.onupgradeneeded=()=>r.result.createObjectStore("kv");
+    r.onsuccess=()=>{ this.db=r.result; res(this.db); }; r.onerror=()=>rej(r.error); }); },
+  async get(k){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction("kv","readonly").objectStore("kv").get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error); }); },
+  async set(k,v){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction("kv","readwrite").objectStore("kv").put(v,k); t.onsuccess=()=>res(); t.onerror=()=>rej(t.error); }); },
+};
+let _fsaHandle=null;
+async function fsaGetHandle(){ if(_fsaHandle) return _fsaHandle; _fsaHandle=await _idb.get("fileHandle"); return _fsaHandle; }
+async function fsaEnsurePermission(handle, mode){
+  const opts={ mode:mode||"readwrite" };
+  if((await handle.queryPermission(opts))==="granted") return true;
+  return (await handle.requestPermission(opts))==="granted";
+}
+const fsaBackend = {
+  async read(){
+    const h=await fsaGetHandle(); if(!h) throw new Error("尚未选择同步文件");
+    if(!await fsaEnsurePermission(h,"read")) throw new Error("没有文件读取权限");
+    const file=await h.getFile(); const txt=await file.text();
+    if(!txt.trim()) return null;
+    try{ return JSON.parse(txt); }catch(e){ throw new Error("同步文件格式异常"); }
+  },
+  async write(payload){
+    const h=await fsaGetHandle(); if(!h) throw new Error("尚未选择同步文件");
+    if(!await fsaEnsurePermission(h,"readwrite")) throw new Error("没有文件写入权限");
+    const w=await h.createWritable(); await w.write(JSON.stringify(payload,null,2)); await w.close();
+  },
+};
+function currentBackend(){
+  const k=syncBackendKind();
+  if(k==="webdav") return webdavBackend;
+  if(k==="fsa") return fsaBackend;
+  return null;
+}
+
+/* ---- 拉取合并 / 推送 ---- */
+async function syncPull(){
+  const be=currentBackend(); if(!be) return {ok:false, reason:"无同步后端"};
+  const remote=await be.read();
+  const rs=payloadState(remote);
+  if(!rs) return {ok:true, applied:false};   // 云端还没有数据
+  const rTs=+(remote.updatedAt||0);
+  if(rTs>_syncUpdatedAt){
+    state=rs;
+    _syncUpdatedAt=rTs;
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); localStorage.setItem(SYNC_TS_KEY,String(_syncUpdatedAt)); }catch(e){}
+    expanded={}; current=0; switchView(view||"day");
+    return {ok:true, applied:true};
+  }
+  return {ok:true, applied:false};
+}
+async function syncPush(){
+  const be=currentBackend(); if(!be) return {ok:false, reason:"无同步后端"};
+  await be.write(syncPayload());
+  return {ok:true};
+}
+// save() 后防抖推送（约 2s）；无后端 / 未配置时静默跳过
+function scheduleSyncPush(){
+  if(!currentBackend()) return;
+  clearTimeout(_syncPushTimer);
+  _syncPushTimer=setTimeout(()=>{ syncPush().catch(e=>console.warn("云同步推送失败",e)); }, 2000);
+}
+// 打开时先拉一次
+async function syncOnOpen(){
+  if(!currentBackend()) return;
+  try{ await syncPull(); }catch(e){ console.warn("云同步拉取失败",e); }
+}
+
+
 (function setupPWA(){
   // 用 http(s) 打开时注册 Service Worker，支持离线；file:// 直接打开则跳过
   if("serviceWorker" in navigator && location.protocol.startsWith("http")){
@@ -2947,6 +3171,9 @@ document.getElementById("backupBtn").onclick=()=>{
     });
   }
 })();
+
+// 打开时先尝试从云端拉取（无后端 / 未配置时静默跳过）；放在最后确保同步相关定义已就绪
+syncOnOpen();
 </script>
 </body>
 </html>

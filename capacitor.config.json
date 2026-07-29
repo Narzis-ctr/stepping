@@ -1,0 +1,13 @@
+{
+  "appId": "com.narzis.stepping",
+  "appName": "步步",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
