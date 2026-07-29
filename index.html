@@ -1714,73 +1714,77 @@ async function openSessionEditor(sessionObj){
   // 新增时若当天没有任何叶子任务，无法归属，提示
   if(isNew && !leaves.length){ dlgAlert("当天还没有可归属的任务，先在清单里添加一个任务。"); return; }
 
-  let task = isNew ? null : sessionObj.task;
-  // 编辑已有段：先给「修改 / 删除 / 取消」三选一
+  // —— 编辑已有段：一级菜单「修改任务 / 修改时间 / 删除」，各走各的分支 ——
   if(!isNew){
     const t1=new Date(sessionObj.ref.start), t2=new Date(sessionObj.ref.end);
     const hm=d=>`${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     const choice=await _openDialog({
-      title:`「${task.text}」 ${hm(t1)}–${hm(t2)}`,
+      title:`「${sessionObj.task.text}」 ${hm(t1)}–${hm(t2)}`,
       buttons:[
-        {label:"修改时间",style:"ghost",value:"edit"},
+        {label:"修改任务",style:"ghost",value:"task"},
+        {label:"修改时间",style:"ghost",value:"time"},
         {label:"删除这段",style:"ghost",value:"del"},
         {label:"取消",style:"ghost",value:null},
       ],
     });
-    if(choice===null||choice===undefined) return;
-    if(choice==="del"){ await deleteSession(sessionObj); return; }
+    if(choice==="task") return editSessionTask(sessionObj, leaves);
+    if(choice==="time") return editSessionTime(sessionObj);
+    if(choice==="del")  { await deleteSession(sessionObj); return; }
+    return;  // 取消
   }
-  // 默认时间：编辑用原值；新增给"现在往前 25 分钟"，落在当前查看日期
-  let startMs, endMs;
-  if(isNew){
-    const now=new Date();
-    const [y,m,d]=currentDate.split("-").map(Number);
-    endMs=new Date(y,m-1,d, now.getHours(), now.getMinutes()).getTime();
-    startMs=endMs-25*60000;
-  }else{ startMs=sessionObj.ref.start; endMs=sessionObj.ref.end; }
 
-  // 1) 选/确认归属任务（新增必选；编辑可换）
-  if(isNew || leaves.length>1){
+  // —— 新增（补记）：先选归属任务，再选起止时间 ——
+  let task=leaves[0];
+  if(leaves.length>1){
     const btns=leaves.map(t=>({label:t.text, style:"ghost", value:t.id}));
     btns.push({label:"取消",style:"ghost",value:null});
-    const preTitle = isNew? "这段专注属于哪个任务？" : `属于「${task.text}」，换个任务？`;
-    const pick=await _openDialog({ title:preTitle, buttons:btns });
-    if(pick===null||pick===undefined){ if(isNew) return; }   // 编辑时取消换任务 → 保持原任务
-    else task=leaves.find(t=>t.id===pick)||task;
+    const pick=await _openDialog({ title:"这段专注属于哪个任务？", buttons:btns });
+    if(pick===null||pick===undefined) return;
+    task=leaves.find(t=>t.id===pick)||task;
   }
-  if(!task) return;
-
-  // 2) 选开始时间
-  const toStr=ms=>{ const d=new Date(ms); return `${dateStr(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
-  const s1=await openDatePicker({ value:toStr(startMs), withTime:true, title:"开始时间" });
-  if(s1===undefined) return;              // 取消整个流程
-  if(s1===null){ /* 清除 → 视为放弃 */ return; }
-  startMs=new Date(s1).getTime();
-
-  // 3) 选结束时间
-  const s2=await openDatePicker({ value:toStr(endMs<=startMs? startMs+25*60000 : endMs), withTime:true, title:"结束时间" });
-  if(s2===undefined) return;
-  if(s2===null) return;
-  endMs=new Date(s2).getTime();
-
-  if(endMs<=startMs){ dlgAlert("结束时间要晚于开始时间。"); return; }
-  const focusSec=Math.round((endMs-startMs)/1000);
-  if(focusSec>24*3600){ dlgAlert("单段专注不超过 24 小时。"); return; }
-
-  if(isNew){
-    if(!task.sessions) task.sessions=[];
-    task.sessions.push({ start:startMs, end:endMs, focusSec, manual:true });
-  }else{
-    // 若换了任务，需把 session 从旧任务挪到新任务
-    if(task!==sessionObj.task){
-      const arr=sessionObj.task.sessions||[];
-      const i=arr.indexOf(sessionObj.ref); if(i>=0) arr.splice(i,1);
-      if(!task.sessions) task.sessions=[];
-      task.sessions.push(sessionObj.ref);
-    }
-    sessionObj.ref.start=startMs; sessionObj.ref.end=endMs; sessionObj.ref.focusSec=focusSec;
-  }
+  const now=new Date();
+  const [y,m,d]=currentDate.split("-").map(Number);
+  const endMs=new Date(y,m-1,d, now.getHours(), now.getMinutes()).getTime();
+  const range=await pickTimeRange(endMs-25*60000, endMs);
+  if(!range) return;
+  if(!task.sessions) task.sessions=[];
+  task.sessions.push({ start:range.startMs, end:range.endMs, focusSec:range.focusSec, manual:true });
   save(); rerender();
+}
+// 只改归属任务
+async function editSessionTask(sessionObj, leaves){
+  const btns=leaves.map(t=>({label:t.text+(t===sessionObj.task?" ·当前":""), style:"ghost", value:t.id}));
+  btns.push({label:"取消",style:"ghost",value:null});
+  const pick=await _openDialog({ title:`这段专注属于哪个任务？`, buttons:btns });
+  if(pick===null||pick===undefined) return;
+  const task=leaves.find(t=>t.id===pick);
+  if(!task || task===sessionObj.task) return;
+  const arr=sessionObj.task.sessions||[];
+  const i=arr.indexOf(sessionObj.ref); if(i>=0) arr.splice(i,1);
+  if(!task.sessions) task.sessions=[];
+  task.sessions.push(sessionObj.ref);
+  save(); rerender();
+}
+// 只改起止时间
+async function editSessionTime(sessionObj){
+  const range=await pickTimeRange(sessionObj.ref.start, sessionObj.ref.end);
+  if(!range) return;
+  sessionObj.ref.start=range.startMs; sessionObj.ref.end=range.endMs; sessionObj.ref.focusSec=range.focusSec;
+  save(); rerender();
+}
+// 依次弹「开始时间」「结束时间」，校验后返回 {startMs,endMs,focusSec}，取消/非法返回 null
+async function pickTimeRange(defStart, defEnd){
+  const toStr=ms=>{ const d=new Date(ms); return `${dateStr(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+  const s1=await openDatePicker({ value:toStr(defStart), withTime:true, title:"开始时间" });
+  if(s1===undefined||s1===null) return null;
+  const startMs=new Date(s1).getTime();
+  const s2=await openDatePicker({ value:toStr(defEnd<=startMs? startMs+25*60000 : defEnd), withTime:true, title:"结束时间" });
+  if(s2===undefined||s2===null) return null;
+  const endMs=new Date(s2).getTime();
+  if(endMs<=startMs){ dlgAlert("结束时间要晚于开始时间。"); return null; }
+  const focusSec=Math.round((endMs-startMs)/1000);
+  if(focusSec>24*3600){ dlgAlert("单段专注不超过 24 小时。"); return null; }
+  return { startMs, endMs, focusSec };
 }
 // 单独的删除入口：编辑弹层里点"删除这段"时调用
 async function deleteSession(sessionObj){
